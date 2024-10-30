@@ -9,6 +9,8 @@ public static partial class StructuralEqualityComparer
 {
     private sealed class Builder : TypeShapeVisitor, ITypeShapeFunc
     {
+        private static readonly SipHash Hash = new();
+        
         private readonly TypeDictionary _cache = new();
 
         public IEqualityComparer<T> BuildEqualityComparer<T>(ITypeShape<T> shape) =>
@@ -25,7 +27,7 @@ public static partial class StructuralEqualityComparer
                 // and types implementing IEquatable<T> except for records.
                 return EqualityComparer<T>.Default;
             }
-            
+
             if (typeof(T) == typeof(object))
             {
                 return new PolymorphicObjectEqualityComparer(type.Provider);
