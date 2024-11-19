@@ -15,10 +15,12 @@ internal abstract class ReflectionDictionaryTypeShape<TDictionary, TKey, TValue>
 {
     private CollectionConstructionStrategy? _constructionStrategy;
     private ConstructorInfo? _defaultCtor;
+    private ConstructorInfo? _equalityComparerConstructor;
     private MethodInfo? _addMethod;
     private MethodBase? _enumerableCtor;
     private MethodBase? _spanCtor;
     private ConstructorInfo? _dictionaryCtor;
+    private ConstructorInfo? _dictionaryEqualityComparerCtor;
     private bool _isFSharpMap;
 
     public sealed override TypeShapeKind Kind => TypeShapeKind.Dictionary;
@@ -29,6 +31,8 @@ internal abstract class ReflectionDictionaryTypeShape<TDictionary, TKey, TValue>
     public ITypeShape<TValue> ValueType => Provider.GetShape<TValue>();
     ITypeShape IDictionaryTypeShape.KeyType => KeyType;
     ITypeShape IDictionaryTypeShape.ValueType => ValueType;
+
+    public bool IsHashTable => _equalityComparerConstructor is not null;
 
     public abstract Func<TDictionary, IReadOnlyDictionary<TKey, TValue>> GetGetDictionary();
 
@@ -43,7 +47,7 @@ internal abstract class ReflectionDictionaryTypeShape<TDictionary, TKey, TValue>
         return Provider.MemberAccessor.CreateDictionaryAddDelegate<TDictionary, TKey, TValue>(_addMethod);
     }
 
-    public Func<TDictionary> GetDefaultConstructor()
+    public DefaultConstructorWithEqualityComparer<TDictionary, TKey> GetDefaultConstructor()
     {
         if (ConstructionStrategy is not CollectionConstructionStrategy.Mutable)
         {
@@ -51,7 +55,17 @@ internal abstract class ReflectionDictionaryTypeShape<TDictionary, TKey, TValue>
         }
 
         Debug.Assert(_defaultCtor != null);
-        return Provider.MemberAccessor.CreateDefaultConstructor<TDictionary>(new MethodConstructorShapeInfo(typeof(TDictionary), _defaultCtor, parameters: []));
+
+        if (_dictionaryEqualityComparerCtor is not null)
+        {
+            DefaultConstructorWithEqualityComparer<TDictionary, TKey> ctor = provider.MemberAccessor.CreateEqualityComparerConstructor<TDictionary, TKey>(new MethodConstructorShapeInfo(typeof(TDictionary), _dictionaryEqualityComparerCtor, parameters: []));
+            return eq => ctor(eq ?? EqualityComparer<TKey>.Default);
+        }
+        else
+        {
+            Func<TDictionary> ctor = Provider.MemberAccessor.CreateDefaultConstructor<TDictionary>(new MethodConstructorShapeInfo(typeof(TDictionary), _defaultCtor, parameters: []));
+            return _ => ctor();
+        }
     }
 
     public Func<IEnumerable<KeyValuePair<TKey, TValue>>, TDictionary> GetEnumerableConstructor()
@@ -114,6 +128,11 @@ internal abstract class ReflectionDictionaryTypeShape<TDictionary, TKey, TValue>
             {
                 _defaultCtor = defaultCtor;
                 _addMethod = addMethod;
+
+                // Look for an EqualityComparer<T> constructor, which is optional.
+                _equalityComparerConstructor = typeof(TDictionary).GetConstructors()
+                    .FirstOrDefault(ctor => ctor.GetParameters() is [ParameterInfo { ParameterType.IsGenericType: true } p] && p.ParameterType.IsEquivalentTo(typeof(IEqualityComparer<>).MakeGenericType(typeof(TKey))));
+
                 return CollectionConstructionStrategy.Mutable;
             }
         }
@@ -137,6 +156,11 @@ internal abstract class ReflectionDictionaryTypeShape<TDictionary, TKey, TValue>
         {
             // Handle types with ctors accepting IDictionary or IReadOnlyDictionary such as ReadOnlyDictionary<TKey, TValue>
             _dictionaryCtor = dictionaryCtor;
+
+            // Look for an EqualityComparer<T> constructor, which is optional.
+            _dictionaryEqualityComparerCtor = typeof(TDictionary).GetConstructors()
+                .FirstOrDefault(ctor => ctor.GetParameters() is [{ ParameterType: Type { IsGenericType: true } first }, { ParameterType: { IsGenericType: true } second }] && first.IsAssignableFrom(typeof(Dictionary<TKey, TValue>)) && second.IsAssignableFrom(typeof(IEqualityComparer<TKey>)));
+
             return CollectionConstructionStrategy.Span;
         }
 

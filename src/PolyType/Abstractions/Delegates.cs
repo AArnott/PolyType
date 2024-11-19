@@ -33,5 +33,15 @@ public delegate TDeclaringType Constructor<TArgumentState, TDeclaringType>(ref T
 /// <typeparam name="T">The element type of the span parameters.</typeparam>
 /// <typeparam name="TDeclaringType">The type of the value produced by the constructor.</typeparam>
 /// <param name="values">The span of values used to create the instance.</param>
+/// <param name="comparer">An optional equality comparer.</param>
 /// <returns>A newly constructed instance using the specified values.</returns>
-public delegate TDeclaringType SpanConstructor<T, TDeclaringType>(ReadOnlySpan<T> values);
+public delegate TDeclaringType SpanConstructor<T, TDeclaringType>(ReadOnlySpan<T> values, IEqualityComparer<T>? comparer = default);
+
+/// <summary>
+/// Delegate representing a constructor of a mutable collection type, that may accept an equality comparer.
+/// </summary>
+/// <typeparam name="TDeclaringType">The type of collection created by the delegate.</typeparam>
+/// <typeparam name="TKey">The type of key in the collection.</typeparam>
+/// <param name="comparer">An optional equality comparer.</param>
+/// <returns>The new instance of the collection.</returns>
+public delegate TDeclaringType DefaultConstructorWithEqualityComparer<TDeclaringType, TKey>(IEqualityComparer<TKey>? comparer = default);

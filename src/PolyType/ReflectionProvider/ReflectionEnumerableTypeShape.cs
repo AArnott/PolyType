@@ -75,7 +75,7 @@ internal abstract class ReflectionEnumerableTypeShape<TEnumerable, TElement>(Ref
         if (_listCtor is ConstructorInfo listCtor)
         {
             var listCtorDelegate = Provider.MemberAccessor.CreateFuncDelegate<List<TElement>, TEnumerable>(listCtor);
-            return span => listCtorDelegate(CollectionHelpers.CreateList(span));
+            return (span, eq) => listCtorDelegate(CollectionHelpers.CreateList(span));
         }
 
         Debug.Assert(_spanCtor != null);
@@ -201,7 +201,7 @@ internal sealed class ReflectionArrayTypeShape<TElement>(ReflectionTypeShapeProv
 {
     public override CollectionConstructionStrategy ConstructionStrategy => CollectionConstructionStrategy.Span;
     public override Func<TElement[], IEnumerable<TElement>> GetGetEnumerable() => static array => array;
-    public override SpanConstructor<TElement, TElement[]> GetSpanConstructor() => static span => span.ToArray();
+    public override SpanConstructor<TElement, TElement[]> GetSpanConstructor() => static (span, eq) => span.ToArray();
 }
 
 [RequiresUnreferencedCode(ReflectionTypeShapeProvider.RequiresUnreferencedCodeMessage)]
@@ -223,7 +223,7 @@ internal sealed class ReadOnlyMemoryTypeShape<TElement>(ReflectionTypeShapeProvi
 {
     public override CollectionConstructionStrategy ConstructionStrategy => CollectionConstructionStrategy.Span;
     public override Func<ReadOnlyMemory<TElement>, IEnumerable<TElement>> GetGetEnumerable() => static memory => MemoryMarshal.ToEnumerable(memory);
-    public override SpanConstructor<TElement, ReadOnlyMemory<TElement>> GetSpanConstructor() => static span => span.ToArray();
+    public override SpanConstructor<TElement, ReadOnlyMemory<TElement>> GetSpanConstructor() => static (span, eq) => span.ToArray();
 }
 
 [RequiresUnreferencedCode(ReflectionTypeShapeProvider.RequiresUnreferencedCodeMessage)]
@@ -233,5 +233,5 @@ internal sealed class MemoryTypeShape<TElement>(ReflectionTypeShapeProvider prov
 {
     public override CollectionConstructionStrategy ConstructionStrategy => CollectionConstructionStrategy.Span;
     public override Func<Memory<TElement>, IEnumerable<TElement>> GetGetEnumerable() => static memory => MemoryMarshal.ToEnumerable((ReadOnlyMemory<TElement>)memory);
-    public override SpanConstructor<TElement, Memory<TElement>> GetSpanConstructor() => static span => span.ToArray();
+    public override SpanConstructor<TElement, Memory<TElement>> GetSpanConstructor() => static (span, eq) => span.ToArray();
 }

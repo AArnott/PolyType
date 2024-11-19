@@ -34,7 +34,7 @@ public sealed class SourceGenDictionaryTypeShape<TDictionary, TKey, TValue> : So
     /// <summary>
     /// The function that constructs a default instance of the dictionary type.
     /// </summary>
-    public Func<TDictionary>? DefaultConstructorFunc { get; init; }
+    public DefaultConstructorWithEqualityComparer<TDictionary, TKey>? DefaultConstructorFunc { get; init; }
 
     /// <summary>
     /// The function that adds a key-value pair to the dictionary.
@@ -63,7 +63,7 @@ public sealed class SourceGenDictionaryTypeShape<TDictionary, TKey, TValue> : So
     Func<TDictionary, IReadOnlyDictionary<TKey, TValue>> IDictionaryTypeShape<TDictionary, TKey, TValue>.GetGetDictionary()
         => GetDictionaryFunc;
 
-    Func<TDictionary> IDictionaryTypeShape<TDictionary, TKey, TValue>.GetDefaultConstructor()
+    DefaultConstructorWithEqualityComparer<TDictionary, TKey> IDictionaryTypeShape<TDictionary, TKey, TValue>.GetDefaultConstructor()
         => DefaultConstructorFunc ?? throw new InvalidOperationException("Dictionary shape does not specify a default constructor.");
 
     Setter<TDictionary, KeyValuePair<TKey, TValue>> IDictionaryTypeShape<TDictionary, TKey, TValue>.GetAddKeyValuePair()

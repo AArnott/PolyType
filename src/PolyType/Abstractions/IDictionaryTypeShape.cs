@@ -34,6 +34,11 @@ public interface IDictionaryTypeShape : ITypeShape
 
     /// <inheritdoc/>
     TypeShapeKind ITypeShape.Kind => TypeShapeKind.Dictionary;
+
+    /// <summary>
+    /// Determines whether the dictionary is a hash table (i.e. it could utilize an <see cref="IEqualityComparer{T}"/>).
+    /// </summary>
+    bool IsHashTable { get; }
 }
 
 /// <summary>
@@ -79,7 +84,7 @@ public interface IDictionaryTypeShape<TDictionary, TKey, TValue> : ITypeShape<TD
     /// </summary>
     /// <exception cref="InvalidOperationException">The collection is not <see cref="CollectionConstructionStrategy.Mutable"/>.</exception>
     /// <returns>A delegate wrapping a default constructor.</returns>
-    Func<TDictionary> GetDefaultConstructor();
+    DefaultConstructorWithEqualityComparer<TDictionary, TKey> GetDefaultConstructor();
 
     /// <summary>
     /// Creates a setter delegate used for appending a

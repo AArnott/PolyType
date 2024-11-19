@@ -158,6 +158,13 @@ internal sealed class ReflectionMemberAccessor : IReflectionMemberAccessor
             : static () => default(TDeclaringType)!;
     }
 
+    public DefaultConstructorWithEqualityComparer<TDeclaringType, TKey> CreateEqualityComparerConstructor<TDeclaringType, TKey>(IConstructorShapeInfo ctorInfo)
+    {
+        return eq => ((MethodConstructorShapeInfo)ctorInfo).ConstructorMethod is { } cI
+            ? () => (TDeclaringType)cI.Invoke([eq])
+            : static () => default(TDeclaringType)!;
+    }
+
     public Type CreateConstructorArgumentStateType(IConstructorShapeInfo ctorInfo)
     {
         return ctorInfo switch

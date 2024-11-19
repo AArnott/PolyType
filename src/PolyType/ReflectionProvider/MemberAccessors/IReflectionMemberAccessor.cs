@@ -13,6 +13,8 @@ internal interface IReflectionMemberAccessor
 
     Func<TDeclaringType> CreateDefaultConstructor<TDeclaringType>(IConstructorShapeInfo ctorInfo);
 
+    DefaultConstructorWithEqualityComparer<TDeclaringType, TKey> CreateEqualityComparerConstructor<TDeclaringType, TKey>(IConstructorShapeInfo ctorInfo);
+
     Type CreateConstructorArgumentStateType(IConstructorShapeInfo ctorInfo);
     Func<TArgumentState> CreateConstructorArgumentStateCtor<TArgumentState>(IConstructorShapeInfo ctorInfo);
     Setter<TArgumentState, TParameter> CreateConstructorArgumentStateSetter<TArgumentState, TParameter>(IConstructorShapeInfo ctorInfo, int parameterIndex);
