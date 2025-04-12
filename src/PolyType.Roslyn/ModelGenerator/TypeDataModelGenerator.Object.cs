@@ -115,7 +115,7 @@ public partial class TypeDataModelGenerator
     {
         foreach (AssociatedTypeModel associatedType in associatedTypes)
         {
-            if (associatedType.Requirements.HasFlag(AssociatedTypeRequirements.Shape))
+            if (associatedType.Requirements.HasFlag(TypeShapeDepth.All))
             {
                 INamedTypeSymbol closedAssociatedType = associatedType.AssociatedType.IsUnboundGenericType
                     ? associatedType.AssociatedType.OriginalDefinition.ConstructRecursive((type as INamedTypeSymbol)?.GetRecursiveTypeArguments() ?? [])!

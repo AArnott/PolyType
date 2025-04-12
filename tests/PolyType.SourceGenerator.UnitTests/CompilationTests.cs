@@ -139,8 +139,8 @@ public static class CompilationTests
             using PolyType;
             using PolyType.Abstractions;
 
-            [AssociatedTypeAttribute(nameof(converterType), AssociatedTypeRequirements.Factory)]
-            [AssociatedTypeAttribute(nameof(Shapes), AssociatedTypeRequirements.Shape)]
+            [AssociatedTypeAttribute(nameof(converterType), TypeShapeDepth.Constructor)]
+            [AssociatedTypeAttribute(nameof(Shapes), TypeShapeDepth.All)]
             [AttributeUsage(AttributeTargets.Class)]
             public class CustomAttribute(Type converterType) : Attribute
             {
@@ -218,8 +218,8 @@ public static class CompilationTests
 
             namespace PolyType.Tests;
 
-            [AssociatedTypeAttribute("Factories", AssociatedTypeRequirements.Factory)]
-            [AssociatedTypeAttribute("Shapes", AssociatedTypeRequirements.Shape)]
+            [AssociatedTypeAttribute("Factories", TypeShapeDepth.Constructor)]
+            [AssociatedTypeAttribute("Shapes", TypeShapeDepth.All)]
             [AttributeUsage(AttributeTargets.Class)]
             public class CustomAttribute : Attribute
             {

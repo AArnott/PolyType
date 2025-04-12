@@ -83,10 +83,10 @@ public sealed partial class Parser : TypeDataModelGenerator
                     continue;
                 }
 
-                MergeAssociatedTypes(KnownSymbols.TypeShapeAssociatedTypesPropertyName, AssociatedTypeRequirements.Factory);
-                MergeAssociatedTypes(KnownSymbols.TypeShapeAssociatedShapesPropertyName, AssociatedTypeRequirements.Shape);
+                MergeAssociatedTypes(KnownSymbols.TypeShapeAssociatedTypesPropertyName, TypeShapeDepth.Constructor);
+                MergeAssociatedTypes(KnownSymbols.TypeShapeAssociatedShapesPropertyName, TypeShapeDepth.All);
 
-                void MergeAssociatedTypes(string propertyName, AssociatedTypeRequirements requirement)
+                void MergeAssociatedTypes(string propertyName, TypeShapeDepth requirement)
                 {
                     var associatedTypesNamedArg = attribute.NamedArguments.FirstOrDefault(kv => kv.Key == propertyName);
                     if (associatedTypesNamedArg.Key is not null && associatedTypesNamedArg.Value is { Kind: TypedConstantKind.Array, Values: { IsDefaultOrEmpty: false } associatedTypesArg })

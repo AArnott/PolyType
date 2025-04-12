@@ -18,7 +18,7 @@ public sealed partial class Parser
 
     private TypeShapeModel MapModelCore(TypeDataModel model, TypeId typeId, string sourceIdentifier, bool isFSharpUnionCase = false)
     {
-        ImmutableEquatableDictionary<AssociatedTypeId, EquatableEnum<AssociatedTypeRequirements>> associatedTypes = CollectAssociatedTypes(model);
+        ImmutableEquatableDictionary<AssociatedTypeId, EquatableEnum<TypeShapeDepth>> associatedTypes = CollectAssociatedTypes(model);
 
         return model switch
         {
@@ -229,7 +229,7 @@ public sealed partial class Parser
         return null;
     }
 
-    private ImmutableEquatableDictionary<AssociatedTypeId, EquatableEnum<AssociatedTypeRequirements>> CollectAssociatedTypes(TypeDataModel model)
+    private ImmutableEquatableDictionary<AssociatedTypeId, EquatableEnum<TypeShapeDepth>> CollectAssociatedTypes(TypeDataModel model)
     {
         var associatedTypeSymbols = model.AssociatedTypes;
 
@@ -239,9 +239,9 @@ public sealed partial class Parser
             associatedTypeSymbols = associatedTypeSymbols.AddRange(extensionModel.AssociatedTypes);
         }
 
-        Dictionary<AssociatedTypeId, EquatableEnum<AssociatedTypeRequirements>> associatedTypesBuilder = new();
+        Dictionary<AssociatedTypeId, EquatableEnum<TypeShapeDepth>> associatedTypesBuilder = new();
         ITypeSymbol[] typeArgs = namedType?.GetRecursiveTypeArguments() ?? [];
-        foreach ((INamedTypeSymbol openType, IAssemblySymbol associatedAssembly, Location? location, AssociatedTypeRequirements requirements) in associatedTypeSymbols)
+        foreach ((INamedTypeSymbol openType, IAssemblySymbol associatedAssembly, Location? location, TypeShapeDepth requirements) in associatedTypeSymbols)
         {
             if (!SymbolEqualityComparer.Default.Equals(openType.ContainingAssembly, associatedAssembly))
             {
@@ -259,14 +259,14 @@ public sealed partial class Parser
             if (!openType.IsUnboundGenericType)
             {
                 var typeId = CreateAssociatedTypeId(openType, openType);
-                if (requirements.HasFlag(AssociatedTypeRequirements.Factory) && TryGetCtorOrReport(openType, out IMethodSymbol? defaultCtor))
+                if (requirements.HasFlag(TypeShapeDepth.Constructor) && TryGetCtorOrReport(openType, out IMethodSymbol? defaultCtor))
                 {
-                    AddOrMerge(typeId, AssociatedTypeRequirements.Factory);
+                    AddOrMerge(typeId, TypeShapeDepth.Constructor);
                 }
 
-                if (requirements.HasFlag(AssociatedTypeRequirements.Shape))
+                if (requirements.HasFlag(TypeShapeDepth.All))
                 {
-                    AddOrMerge(typeId, AssociatedTypeRequirements.Shape);
+                    AddOrMerge(typeId, TypeShapeDepth.All);
                 }
             }
             else
@@ -274,14 +274,14 @@ public sealed partial class Parser
                 if (openType.OriginalDefinition.ConstructRecursive(typeArgs) is INamedTypeSymbol closedType)
                 {
                     var typeId = CreateAssociatedTypeId(openType, closedType);
-                    if (requirements.HasFlag(AssociatedTypeRequirements.Factory) && TryGetCtorOrReport(closedType, out IMethodSymbol? defaultCtor))
+                    if (requirements.HasFlag(TypeShapeDepth.Constructor) && TryGetCtorOrReport(closedType, out IMethodSymbol? defaultCtor))
                     {
-                        AddOrMerge(typeId, AssociatedTypeRequirements.Factory);
+                        AddOrMerge(typeId, TypeShapeDepth.Constructor);
                     }
 
-                    if (requirements.HasFlag(AssociatedTypeRequirements.Shape))
+                    if (requirements.HasFlag(TypeShapeDepth.All))
                     {
-                        AddOrMerge(typeId, AssociatedTypeRequirements.Shape);
+                        AddOrMerge(typeId, TypeShapeDepth.All);
                     }
                 }
                 else if (openType.Arity != typeArgs.Length)
@@ -291,11 +291,11 @@ public sealed partial class Parser
                 }
             }
 
-            void AddOrMerge(AssociatedTypeId typeId, AssociatedTypeRequirements newRequirements)
+            void AddOrMerge(AssociatedTypeId typeId, TypeShapeDepth newRequirements)
             {
-                AssociatedTypeRequirements existingRequirements = associatedTypesBuilder.TryGetValue(typeId, out EquatableEnum<AssociatedTypeRequirements> existingRequirementsWrapper)
+                TypeShapeDepth existingRequirements = associatedTypesBuilder.TryGetValue(typeId, out EquatableEnum<TypeShapeDepth> existingRequirementsWrapper)
                     ? existingRequirementsWrapper.Value
-                    : AssociatedTypeRequirements.None;
+                    : TypeShapeDepth.None;
                 associatedTypesBuilder[typeId] = new(existingRequirements | newRequirements);
             }
 
@@ -312,7 +312,7 @@ public sealed partial class Parser
             }
         }
 
-        ImmutableEquatableDictionary<AssociatedTypeId, EquatableEnum<AssociatedTypeRequirements>> associatedTypes = associatedTypesBuilder.ToImmutableEquatableDictionary();
+        ImmutableEquatableDictionary<AssociatedTypeId, EquatableEnum<TypeShapeDepth>> associatedTypes = associatedTypesBuilder.ToImmutableEquatableDictionary();
         return associatedTypes;
     }
 
@@ -340,7 +340,7 @@ public sealed partial class Parser
                     IsBaseType = derived.IsBaseType,
                 })
                 .ToImmutableEquatableArray(),
-            AssociatedTypes = ImmutableEquatableDictionary<AssociatedTypeId, EquatableEnum<AssociatedTypeRequirements>>.Empty,
+            AssociatedTypes = ImmutableEquatableDictionary<AssociatedTypeId, EquatableEnum<TypeShapeDepth>>.Empty,
         };
     }
 
@@ -617,7 +617,7 @@ public sealed partial class Parser
         }
     }
 
-    private record struct CustomAttributeAssociatedTypeProvider(ImmutableDictionary<string, AssociatedTypeRequirements> NamesAndRequirements);
+    private record struct CustomAttributeAssociatedTypeProvider(ImmutableDictionary<string, TypeShapeDepth> NamesAndRequirements);
 
     private readonly Dictionary<INamedTypeSymbol, CustomAttributeAssociatedTypeProvider> customAttributes = new(SymbolEqualityComparer.Default);
 
@@ -645,7 +645,7 @@ public sealed partial class Parser
             }
 
             Location? location = att.GetLocation();
-            foreach ((string name, AssociatedTypeRequirements requirements) in provider.NamesAndRequirements)
+            foreach ((string name, TypeShapeDepth requirements) in provider.NamesAndRequirements)
             {
                 bool match = false;
 
@@ -694,7 +694,7 @@ public sealed partial class Parser
 
         CustomAttributeAssociatedTypeProvider GetAttributeProviderData(INamedTypeSymbol attributeClass)
         {
-            var names = ImmutableDictionary.CreateBuilder<string, AssociatedTypeRequirements>();
+            var names = ImmutableDictionary.CreateBuilder<string, TypeShapeDepth>();
             foreach (AttributeData att in attributeClass.GetAttributes())
             {
                 if (att.AttributeClass is null)
@@ -706,7 +706,7 @@ public sealed partial class Parser
                 {
                     if (att.ConstructorArguments is [{ Value: string name }, { Value: int requirements}])
                     {
-                        names.Add(name, (AssociatedTypeRequirements)requirements);
+                        names.Add(name, (TypeShapeDepth)requirements);
                     }
                 }
             }
@@ -747,7 +747,7 @@ public sealed partial class Parser
                             associatedTypes = ImmutableArray.CreateRange(
                                 from tc in associatedTypesArray
                                 where tc.Value is INamedTypeSymbol s
-                                select new AssociatedTypeModel((INamedTypeSymbol)tc.Value!, typeSymbol.ContainingAssembly, localLocation, AssociatedTypeRequirements.Factory));
+                                select new AssociatedTypeModel((INamedTypeSymbol)tc.Value!, typeSymbol.ContainingAssembly, localLocation, TypeShapeDepth.Constructor));
                         }
 
                         break;
@@ -757,7 +757,7 @@ public sealed partial class Parser
                             associatedTypes = ImmutableArray.CreateRange(
                                 from tc in associatedShapesArray
                                 where tc.Value is INamedTypeSymbol s
-                                select new AssociatedTypeModel((INamedTypeSymbol)tc.Value!, typeSymbol.ContainingAssembly, localLocation, AssociatedTypeRequirements.Shape));
+                                select new AssociatedTypeModel((INamedTypeSymbol)tc.Value!, typeSymbol.ContainingAssembly, localLocation, TypeShapeDepth.All));
                         }
 
                         break;
