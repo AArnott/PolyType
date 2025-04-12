@@ -264,41 +264,11 @@ public static class DiagnosticTests
 
             partial class Wrapper
             {
-                [TypeShape(AssociatedTypes = new[] { typeof(InternalAssociatedType) })]
+                [AssociatedTypeShape(typeof(InternalAssociatedType))]
                 [GenerateShape]
                 internal partial class MyPoco;
 
                 class InternalAssociatedType;
-            }
-            """);
-
-        PolyTypeSourceGeneratorResult result = CompilationHelpers.RunPolyTypeSourceGenerator(compilation, disableDiagnosticValidation: true);
-
-        Diagnostic diagnostic = Assert.Single(result.Diagnostics);
-
-        Assert.Equal("PT0005", diagnostic.Id);
-        Assert.Equal(DiagnosticSeverity.Warning, diagnostic.Severity);
-        Assert.Equal((4, 5), diagnostic.Location.GetStartPosition());
-        Assert.Equal((4, 74), diagnostic.Location.GetEndPosition());
-    }
-
-    [Fact]
-    [Trait("AssociatedTypes", "true")]
-    public static void TypeShape_PrivateCtorOnAssociatedType()
-    {
-        Compilation compilation = CompilationHelpers.CreateCompilation("""
-            using PolyType;
-
-            partial class Wrapper
-            {
-                [TypeShape(AssociatedTypes = new[] { typeof(InternalAssociatedType) })]
-                [GenerateShape]
-                internal partial class MyPoco;
-
-                public class InternalAssociatedType
-                {
-                    private InternalAssociatedType() { }
-                }
             }
             """);
 

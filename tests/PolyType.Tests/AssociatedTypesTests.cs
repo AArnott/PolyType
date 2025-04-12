@@ -1,7 +1,8 @@
 ﻿using PolyType;
 using PolyType.Tests;
 
-[assembly: TypeShapeExtension(typeof(AssociatedTypesTests.GenericDataType<,>), AssociatedTypes = [typeof(AssociatedTypesTests.GenericDataTypeVerifier<,>)], AssociatedShapes = [typeof(AssociatedTypesTests.ExtraShape<,>)])]
+[assembly: TypeShapeExtension(typeof(AssociatedTypesTests.GenericDataType<,>), AssociatedShapeDepth = TypeShapeDepth.Constructor, AssociatedTypes = [typeof(AssociatedTypesTests.GenericDataTypeVerifier<,>)])]
+[assembly: TypeShapeExtension(typeof(AssociatedTypesTests.GenericDataType<,>), AssociatedShapeDepth = TypeShapeDepth.All, AssociatedTypes = [typeof(AssociatedTypesTests.ExtraShape<,>)])]
 
 namespace PolyType.Tests;
 
@@ -134,12 +135,12 @@ public abstract partial class AssociatedTypesTests(ProviderUnderTest providerUnd
         => (typeShape.GetAssociatedTypeShape(associatedType) as IObjectTypeShape)?.GetDefaultConstructor();
 
     [GenerateShape]
-    [TypeShape(AssociatedTypes = [typeof(NonGenericDataTypeConverter)])]
+    [AssociatedTypeShape(typeof(NonGenericDataTypeConverter))]
     public partial class NonGenericDataType;
 
     public class NonGenericDataTypeConverter;
 
-    [TypeShape(AssociatedTypes = [typeof(GenericDataTypeConverter<,>), typeof(GenericDataTypeCloner<,>), typeof(NonGenericDataTypeConverter), typeof(GenericWrapper<>.GenericNested<>)])]
+    [AssociatedTypeShape(typeof(GenericDataTypeConverter<,>), typeof(GenericDataTypeCloner<,>), typeof(NonGenericDataTypeConverter), typeof(GenericWrapper<>.GenericNested<>))]
     public class GenericDataType<T1, T2>;
 
     public class GenericDataTypeConverter<T1, T2>;

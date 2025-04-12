@@ -115,11 +115,14 @@ public partial class TypeDataModelGenerator
     {
         foreach (AssociatedTypeModel associatedType in associatedTypes)
         {
-            if (associatedType.Requirements.HasFlag(TypeShapeDepth.All))
+            if (associatedType.Requirements != TypeShapeDepth.None)
             {
                 INamedTypeSymbol closedAssociatedType = associatedType.AssociatedType.IsUnboundGenericType
                     ? associatedType.AssociatedType.OriginalDefinition.ConstructRecursive((type as INamedTypeSymbol)?.GetRecursiveTypeArguments() ?? [])!
                     : associatedType.AssociatedType;
+
+                // TODO: filter the shape down to just the required elements,
+                // but consider that the shape might be brought in another way that requires more elements.
                 IncludeNestedType(closedAssociatedType, ref ctx);
             }
         }

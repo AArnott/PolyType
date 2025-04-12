@@ -14,6 +14,9 @@ public record struct AssociatedTypeModel(INamedTypeSymbol AssociatedType, IAssem
 /// <summary>
 /// Describes the requirements for preparing an associated type.
 /// </summary>
+/// <devremarks>
+/// Keep this in sync with the TypeShapeDepth enum defined in the PolyType assembly.
+/// </devremarks>
 [Flags]
 public enum TypeShapeDepth
 {

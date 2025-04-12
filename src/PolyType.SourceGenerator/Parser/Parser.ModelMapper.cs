@@ -259,30 +259,14 @@ public sealed partial class Parser
             if (!openType.IsUnboundGenericType)
             {
                 var typeId = CreateAssociatedTypeId(openType, openType);
-                if (requirements.HasFlag(TypeShapeDepth.Constructor) && TryGetCtorOrReport(openType, out IMethodSymbol? defaultCtor))
-                {
-                    AddOrMerge(typeId, TypeShapeDepth.Constructor);
-                }
-
-                if (requirements.HasFlag(TypeShapeDepth.All))
-                {
-                    AddOrMerge(typeId, TypeShapeDepth.All);
-                }
+                AddOrMerge(typeId, requirements);
             }
             else
             {
                 if (openType.OriginalDefinition.ConstructRecursive(typeArgs) is INamedTypeSymbol closedType)
                 {
                     var typeId = CreateAssociatedTypeId(openType, closedType);
-                    if (requirements.HasFlag(TypeShapeDepth.Constructor) && TryGetCtorOrReport(closedType, out IMethodSymbol? defaultCtor))
-                    {
-                        AddOrMerge(typeId, TypeShapeDepth.Constructor);
-                    }
-
-                    if (requirements.HasFlag(TypeShapeDepth.All))
-                    {
-                        AddOrMerge(typeId, TypeShapeDepth.All);
-                    }
+                    AddOrMerge(typeId, requirements);
                 }
                 else if (openType.Arity != typeArgs.Length)
                 {
@@ -297,18 +281,6 @@ public sealed partial class Parser
                     ? existingRequirementsWrapper.Value
                     : TypeShapeDepth.None;
                 associatedTypesBuilder[typeId] = new(existingRequirements | newRequirements);
-            }
-
-            bool TryGetCtorOrReport(INamedTypeSymbol type, out IMethodSymbol? defaultCtor)
-            {
-                defaultCtor = type.InstanceConstructors.FirstOrDefault(c => c.Parameters.IsEmpty);
-                if (defaultCtor is null || !IsAccessibleSymbol(defaultCtor))
-                {
-                    ReportDiagnostic(TypeNotAccessible, location, openType.ToDisplayString());
-                    return false;
-                }
-
-                return true;
             }
         }
 

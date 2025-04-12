@@ -79,7 +79,7 @@ public static class CompilationTests
         Compilation compilation = CompilationHelpers.CreateCompilation("""
             using PolyType;
 
-            [TypeShape(AssociatedTypes = [typeof(GenericConverter<,>)])]
+            [AssociatedTypeShape(typeof(GenericConverter<,>))]
             public class GenericClass<T1, T2>;
             public class GenericConverter<T1, T2>;
 
@@ -98,7 +98,7 @@ public static class CompilationTests
         Compilation compilation = CompilationHelpers.CreateCompilation("""
             using PolyType;
 
-            [TypeShape(AssociatedShapes = [typeof(GenericHelper<,>)])]
+            [AssociatedTypeShape(typeof(GenericHelper<,>))]
             public class GenericClass<T1, T2>;
             public class GenericHelper<T1, T2>;
 
@@ -117,7 +117,7 @@ public static class CompilationTests
         Compilation compilation = CompilationHelpers.CreateCompilation("""
             using PolyType;
 
-            [assembly: TypeShapeExtension(typeof(GenericClass<,>), AssociatedShapes = [typeof(GenericHelper<,>)])]
+            [assembly: TypeShapeExtension(typeof(GenericClass<,>), AssociatedTypes = [typeof(GenericHelper<,>)])]
 
             public class GenericClass<T1, T2>;
             public class GenericHelper<T1, T2>;
@@ -169,7 +169,7 @@ public static class CompilationTests
         Compilation compilation = CompilationHelpers.CreateCompilation("""
             using PolyType;
 
-            [TypeShape(AssociatedTypes = [typeof(GenericConverter<,>), typeof(GenericConverter<,>)])]
+            [AssociatedTypeShape(typeof(GenericConverter<,>), typeof(GenericConverter<,>))]
             public class GenericClass<T1, T2>;
             public class GenericConverter<T1, T2>;
 
@@ -190,7 +190,7 @@ public static class CompilationTests
 
             public partial class AssociatedTypesTests
             {
-                [TypeShape(AssociatedTypes = [typeof(GenericWrapper<>.GenericNested<>)])]
+                [AssociatedTypeShape(typeof(GenericWrapper<>.GenericNested<>))]
                 public class GenericClass<T1, T2>;
 
                 public class GenericWrapper<T1>

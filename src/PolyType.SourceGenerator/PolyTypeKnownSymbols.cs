@@ -5,6 +5,24 @@ namespace PolyType.SourceGenerator;
 
 public sealed class PolyTypeKnownSymbols(Compilation compilation) : KnownSymbols(compilation)
 {
+    /// <summary>
+    /// Names of members on the TypeShapeExtensionAttribute.
+    /// </summary>
+    public static class TypeShapeExtensionAttributePropertyNames
+    {
+        public const string AssociatedShapeDepth = "AssociatedShapeDepth";
+        public const string AssociatedTypes = "AssociatedTypes";
+    }
+
+    /// <summary>
+    /// Names of members on the AssociatedTypeShapeAttribute.
+    /// </summary>
+    public static class AssociatedTypeShapeAttributePropertyNames
+    {
+        public const string Requirements = "Requirements";
+        public const string AssociatedTypes = "AssociatedTypes";
+    }
+
     public INamedTypeSymbol? GenerateShapeAttribute => GetOrResolveType("PolyType.GenerateShapeAttribute", ref _GenerateShapeAttribute);
     private Option<INamedTypeSymbol?> _GenerateShapeAttribute;
 
@@ -19,6 +37,9 @@ public sealed class PolyTypeKnownSymbols(Compilation compilation) : KnownSymbols
 
     public INamedTypeSymbol? AssociatedTypeAttributeAttribute => GetOrResolveType("PolyType.Abstractions.AssociatedTypeAttributeAttribute", ref _AssociatedTypeAttributeAttribute);
     private Option<INamedTypeSymbol?> _AssociatedTypeAttributeAttribute;
+
+    public INamedTypeSymbol? AssociatedTypeShapeAttribute => GetOrResolveType("PolyType.Abstractions.AssociatedTypeShapeAttribute", ref _AssociatedTypeShapeAttribute);
+    private Option<INamedTypeSymbol?> _AssociatedTypeShapeAttribute;
 
     public INamedTypeSymbol? PropertyShapeAttribute => GetOrResolveType("PolyType.PropertyShapeAttribute", ref _PropertyShapeAttribute);
     private Option<INamedTypeSymbol?> _PropertyShapeAttribute;
