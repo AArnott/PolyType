@@ -50,9 +50,14 @@ public abstract partial class AssociatedTypesTests(ProviderUnderTest providerUnd
     {
         ITypeShape? typeShape = providerUnderTest.Provider.GetShape(typeof(GenericDataType<int, string>));
         Assert.NotNull(typeShape);
-        Func<object>? factory = GetAssociatedTypeFactory(typeShape, typeof(GenericDataTypeVerifier<,>));
+        IObjectTypeShape? associatedShape = (IObjectTypeShape?)typeShape.GetAssociatedTypeShape(typeof(GenericDataTypeVerifier<,>));
+        Assert.NotNull(associatedShape);
+        Func<object>? factory = associatedShape.GetDefaultConstructor();
         Assert.NotNull(factory);
         Assert.IsType<GenericDataTypeVerifier<int, string>>(factory.Invoke());
+
+        // Verify the associated type's shape is only partially available.
+        Assert.Empty(associatedShape.Properties);
     }
 
     [Fact]
@@ -145,7 +150,10 @@ public abstract partial class AssociatedTypesTests(ProviderUnderTest providerUnd
 
     public class GenericDataTypeConverter<T1, T2>;
     public class GenericDataTypeCloner<T1, T2>;
-    public class GenericDataTypeVerifier<T1, T2>;
+    public class GenericDataTypeVerifier<T1, T2>
+    {
+        public string? Property { get; set; }
+    }
 
     /// <summary>
     /// A class that should <em>not</em> be directly referenced by any other shaped type.
