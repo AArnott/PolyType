@@ -594,6 +594,11 @@ public sealed partial class Parser
 
     private readonly Dictionary<INamedTypeSymbol, CustomAttributeAssociatedTypeProvider> customAttributes = new(SymbolEqualityComparer.Default);
 
+    /// <summary>
+    /// Gets the associated types for a given type, as specified by 3rd party custom attributes.
+    /// </summary>
+    /// <param name="typeSymbol">The type whose associated types are sought.</param>
+    /// <param name="associatedTypes">The associated types for the given <paramref name="typeSymbol"/>.</param>
     private void ParseCustomAssociatedTypeAttributes(
         ITypeSymbol typeSymbol,
         out ImmutableArray<AssociatedTypeModel> associatedTypes)
@@ -692,7 +697,6 @@ public sealed partial class Parser
         ITypeSymbol typeSymbol,
         out TypeShapeKind? kind,
         out ITypeSymbol? marshaller,
-        out ImmutableArray<AssociatedTypeModel> associatedTypes,
         out Location? location)
     {
         kind = null;
@@ -701,6 +705,7 @@ public sealed partial class Parser
 
         if (typeSymbol.GetAttribute(_knownSymbols.TypeShapeAttribute) is AttributeData propertyAttr)
         {
+            location = propertyAttr.GetLocation();
             foreach (KeyValuePair<string, TypedConstant> namedArgument in propertyAttr.NamedArguments)
             {
                 switch (namedArgument.Key)
@@ -714,27 +719,30 @@ public sealed partial class Parser
                 }
             }
         }
+    }
 
-        ParseCustomAssociatedTypeAttributes(typeSymbol, out associatedTypes);
-
+    private ImmutableArray<AssociatedTypeModel> ParseAssociatedTypeShapeAttributes(ITypeSymbol typeSymbol)
+    {
+        ImmutableArray<AssociatedTypeModel>.Builder associatedTypes = ImmutableArray.CreateBuilder<AssociatedTypeModel>();
         foreach (AttributeData associatedTypeAttr in typeSymbol.GetAttributes())
         {
             if (SymbolEqualityComparer.Default.Equals(associatedTypeAttr.AttributeClass, _knownSymbols.AssociatedTypeShapeAttribute))
             {
-                location = associatedTypeAttr.GetLocation();
-                Location? localLocation = location;
+                Location? location = associatedTypeAttr.GetLocation();
 
                 TypeShapeDepth depth = associatedTypeAttr.TryGetNamedArgument(PolyTypeKnownSymbols.AssociatedTypeShapeAttributePropertyNames.Requirements, out TypeShapeDepth depthArg)
                     ? depthArg : TypeShapeDepth.All;
                 if (associatedTypeAttr.ConstructorArguments is [{ Kind: TypedConstantKind.Array, Values: { } typeArgs }, ..])
                 {
-                    associatedTypes = ImmutableArray.CreateRange(associatedTypes.Concat(
+                    associatedTypes.AddRange(
                         from tc in typeArgs
                         where tc.Value is INamedTypeSymbol s
-                        select new AssociatedTypeModel((INamedTypeSymbol)tc.Value!, typeSymbol.ContainingAssembly, localLocation, depth)));
+                        select new AssociatedTypeModel((INamedTypeSymbol)tc.Value!, typeSymbol.ContainingAssembly, location, depth));
                 }
             }
         }
+
+        return associatedTypes.ToImmutable();
     }
 
     private static TypeDataKind? MapTypeShapeKindToDataKind(TypeShapeKind? kind)

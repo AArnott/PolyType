@@ -29,7 +29,12 @@ public enum TypeShapeDepth
     Constructor = 0x1,
 
     /// <summary>
+    /// Properties should be included in the shape, if any are declared.
+    /// </summary>
+    Properties = 0x2,
+
+    /// <summary>
     /// The shape should be fully generated.
     /// </summary>
-    All = -1,
+    All = Constructor | Properties,
 }

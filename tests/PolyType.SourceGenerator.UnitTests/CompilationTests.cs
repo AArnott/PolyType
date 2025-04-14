@@ -132,6 +132,73 @@ public static class CompilationTests
 
     [Fact]
     [Trait("AssociatedTypes", "true")]
+    public static void TypeShapeExtensionWithAssociatedShapes_UnionFlags()
+    {
+        Compilation compilation = CompilationHelpers.CreateCompilation("""
+            using PolyType;
+
+            [assembly: TypeShapeExtension(typeof(GenericClass<,>), AssociatedShapeDepth = TypeShapeDepth.Constructor, AssociatedTypes = [typeof(GenericHelper<,>)])]
+            [assembly: TypeShapeExtension(typeof(GenericClass<,>), AssociatedShapeDepth = TypeShapeDepth.Properties, AssociatedTypes = [typeof(GenericHelper<,>)])]
+
+            public class GenericClass<T1, T2>;
+            public class GenericHelper<T1, T2> { public int Prop { get; set; } }
+
+            [GenerateShape<GenericClass<int, string>>]
+            public partial class Witness;
+            """);
+
+        PolyTypeSourceGeneratorResult result = CompilationHelpers.RunPolyTypeSourceGenerator(compilation);
+        Assert.Empty(result.Diagnostics);
+    }
+
+    [Fact]
+    [Trait("AssociatedTypes", "true")]
+    public static void UnionShapeDepthFlags_AssociatedTypeFirst()
+    {
+        Compilation compilation = CompilationHelpers.CreateCompilation("""
+            using PolyType;
+
+            [assembly: TypeShapeExtension(typeof(GenericClass<,>), AssociatedShapeDepth = TypeShapeDepth.Constructor, AssociatedTypes = [typeof(GenericHelper<,>)])]
+
+            public class GenericClass<T1, T2>;
+            public class GenericHelper<T1, T2> { public int Prop { get; set; } }
+
+            public record AnotherShapeReference(GenericHelper<int, string> helper);
+
+            [GenerateShape<GenericClass<int, string>>]
+            [GenerateShape<AnotherShapeReference>]
+            public partial class Witness;
+            """);
+
+        PolyTypeSourceGeneratorResult result = CompilationHelpers.RunPolyTypeSourceGenerator(compilation);
+        Assert.Empty(result.Diagnostics);
+    }
+
+    [Fact]
+    [Trait("AssociatedTypes", "true")]
+    public static void UnionShapeDepthFlags_FullShapeReferenceFirst()
+    {
+        Compilation compilation = CompilationHelpers.CreateCompilation("""
+            using PolyType;
+
+            [assembly: TypeShapeExtension(typeof(GenericClass<,>), AssociatedShapeDepth = TypeShapeDepth.Constructor, AssociatedTypes = [typeof(GenericHelper<,>)])]
+
+            public class GenericClass<T1, T2>;
+            public class GenericHelper<T1, T2> { public int Prop { get; set; } }
+
+            public record AnotherShapeReference(GenericHelper<int, string> helper);
+
+            [GenerateShape<AnotherShapeReference>]
+            [GenerateShape<GenericClass<int, string>>]
+            public partial class Witness;
+            """);
+
+        PolyTypeSourceGeneratorResult result = CompilationHelpers.RunPolyTypeSourceGenerator(compilation);
+        Assert.Empty(result.Diagnostics);
+    }
+
+    [Fact]
+    [Trait("AssociatedTypes", "true")]
     public static void AssociatedTypeAttribute_Shapes()
     {
         Compilation compilation = CompilationHelpers.CreateCompilation("""

@@ -81,7 +81,7 @@ public partial class TypeDataModelGenerator
     /// <inheritdoc cref="IsRequiredByPolicy(IPropertySymbol)"/>
     protected virtual bool? IsRequiredByPolicy(IFieldSymbol member) => null;
 
-    private bool TryMapObject(ITypeSymbol type, ImmutableArray<AssociatedTypeModel> associatedTypes, ref TypeDataModelGenerationContext ctx, out TypeDataModel? model, out TypeDataModelGenerationStatus status)
+    private bool TryMapObject(ITypeSymbol type, ImmutableArray<AssociatedTypeModel> associatedTypes, ref TypeDataModelGenerationContext ctx, TypeShapeDepth depth, out TypeDataModel? model, out TypeDataModelGenerationStatus status)
     {
         status = default;
         model = null;
@@ -94,14 +94,15 @@ public partial class TypeDataModelGenerator
             return false;
         }
 
-        ImmutableArray<PropertyDataModel> properties = MapProperties(namedType, ref ctx);
-        ImmutableArray<ConstructorDataModel> constructors = MapConstructors(namedType, properties, ref ctx);
-        ImmutableArray<DerivedTypeModel> derivedTypes = IncludeDerivedTypes(type, ref ctx);
+        ImmutableArray<PropertyDataModel> properties = depth.HasFlag(TypeShapeDepth.Properties) ? MapProperties(namedType, ref ctx) : ImmutableArray<PropertyDataModel>.Empty;
+        ImmutableArray<ConstructorDataModel> constructors = depth.HasFlag(TypeShapeDepth.Constructor) ? MapConstructors(namedType, properties, ref ctx) : ImmutableArray<ConstructorDataModel>.Empty;
+        ImmutableArray<DerivedTypeModel> derivedTypes = IncludeDerivedTypes(type, ref ctx, depth);
         IncludeAssociatedShapes(type, associatedTypes, ref ctx);
 
         model = new ObjectDataModel
         {
             Type = type,
+            Depth = depth,
             Constructors = constructors,
             Properties = properties,
             DerivedTypes = derivedTypes,
@@ -126,9 +127,7 @@ public partial class TypeDataModelGenerator
                     continue;
                 }
 
-                // TODO: filter the shape down to just the required elements,
-                // but consider that the shape might be brought in another way that requires more elements.
-                IncludeNestedType(closedAssociatedType, ref ctx);
+                IncludeNestedType(closedAssociatedType, ref ctx, associatedType.Requirements);
             }
         }
     }
