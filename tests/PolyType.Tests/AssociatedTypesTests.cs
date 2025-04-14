@@ -1,8 +1,15 @@
 ﻿using PolyType;
 using PolyType.Tests;
+using Xunit.Internal;
 
 [assembly: TypeShapeExtension(typeof(AssociatedTypesTests.GenericDataType<,>), AssociatedShapeDepth = TypeShapeDepth.Constructor, AssociatedTypes = [typeof(AssociatedTypesTests.GenericDataTypeVerifier<,>)])]
 [assembly: TypeShapeExtension(typeof(AssociatedTypesTests.GenericDataType<,>), AssociatedShapeDepth = TypeShapeDepth.All, AssociatedTypes = [typeof(AssociatedTypesTests.ExtraShape<,>)])]
+
+// This pair is for testing the union of depth flags for a given shape.
+// At the moment, we only have two non-empty flags, so we have to use All as one of them.
+// If we ever get another flag (e.g. Properties), using Constructor and Properties would be a more interesting test.
+[assembly: TypeShapeExtension(typeof(AssociatedTypesTests.GenericDataType<,>), AssociatedShapeDepth = TypeShapeDepth.All, AssociatedTypes = [typeof(AssociatedTypesTests.ExtraShape2<,>)])]
+[assembly: TypeShapeExtension(typeof(AssociatedTypesTests.GenericDataType<,>), AssociatedShapeDepth = TypeShapeDepth.Constructor, AssociatedTypes = [typeof(AssociatedTypesTests.ExtraShape2<,>)])]
 
 namespace PolyType.Tests;
 
@@ -96,9 +103,14 @@ public abstract partial class AssociatedTypesTests(ProviderUnderTest providerUnd
     {
         ITypeShape? typeShape = providerUnderTest.Provider.GetShape(typeof(CustomTypeWithCustomConverter));
         Assert.NotNull(typeShape);
-        Func<object>? factory = GetAssociatedTypeFactory(typeShape, typeof(CustomTypeConverter));
+        IObjectTypeShape<CustomTypeConverter>? associatedShape = (IObjectTypeShape<CustomTypeConverter>?)typeShape.GetAssociatedTypeShape(typeof(CustomTypeConverter));
+        Assert.NotNull(associatedShape);
+        Func<object>? factory = associatedShape.GetDefaultConstructor();
         Assert.NotNull(factory);
         Assert.IsType<CustomTypeConverter>(factory.Invoke());
+
+        // Verify the associated type's shape is only partially available.
+        Assert.Empty(associatedShape.Properties);
     }
 
     [Fact]
@@ -106,13 +118,19 @@ public abstract partial class AssociatedTypesTests(ProviderUnderTest providerUnd
     {
         ITypeShape? typeShape = providerUnderTest.Provider.GetShape(typeof(CustomTypeWithCustomConverter));
         Assert.NotNull(typeShape);
-        Func<object>? factory1 = GetAssociatedTypeFactory(typeShape, typeof(CustomTypeConverter1));
+        IObjectTypeShape? associatedShape = (IObjectTypeShape<CustomTypeConverter1>?)typeShape.GetAssociatedTypeShape(typeof(CustomTypeConverter1));
+        Assert.NotNull(associatedShape);
+        Func<object>? factory1 = associatedShape.GetDefaultConstructor();
         Assert.NotNull(factory1);
         Assert.IsType<CustomTypeConverter1>(factory1.Invoke());
+        Assert.Empty(associatedShape.Properties); // Verify the associated type's shape is only partially available.
 
-        Func<object>? factory2 = GetAssociatedTypeFactory(typeShape, typeof(CustomTypeConverter2));
+        associatedShape = (IObjectTypeShape?)typeShape.GetAssociatedTypeShape(typeof(CustomTypeConverter2));
+        Assert.NotNull(associatedShape);
+        Func<object>? factory2 = associatedShape.GetDefaultConstructor();
         Assert.NotNull(factory2);
         Assert.IsType<CustomTypeConverter2>(factory2.Invoke());
+        Assert.Empty(associatedShape.Properties); // Verify the associated type's shape is only partially available.
     }
 
     [Fact]
@@ -124,15 +142,42 @@ public abstract partial class AssociatedTypesTests(ProviderUnderTest providerUnd
         Assert.NotNull(ordinaryShape);
 
         // Fetch as an independent shape.
-        ITypeShape? associatedShape = providerUnderTest.Provider.GetShape(typeof(ExtraShape<int, string>));
+        IObjectTypeShape? associatedShape = (IObjectTypeShape<ExtraShape<int, string>>?)providerUnderTest.Provider.GetShape(typeof(ExtraShape<int, string>));
         Assert.NotNull(associatedShape);
 
         // Fetch as an associated shape by its unbound generic.
-        associatedShape = ordinaryShape.GetAssociatedTypeShape(typeof(ExtraShape<,>));
+        associatedShape = (IObjectTypeShape<ExtraShape<int, string>>?)ordinaryShape.GetAssociatedTypeShape(typeof(ExtraShape<,>));
         Assert.NotNull(associatedShape);
 
+        // Verify a wholly defined shape.
+        Assert.NotEmpty(associatedShape.Properties);
+
         // Fetch as an associated shape by its closed generic.
-        associatedShape = ordinaryShape.GetAssociatedTypeShape(typeof(ExtraShape<int, string>));
+        associatedShape = (IObjectTypeShape<ExtraShape<int, string>>?)ordinaryShape.GetAssociatedTypeShape(typeof(ExtraShape<int, string>));
+        Assert.NotNull(associatedShape);
+    }
+
+    [Fact]
+    public void TypeShapeExtension_AssociatedShape_UnionFlags()
+    {
+        // Get it through the associated type shape API, which accepts an unbound generic type.
+        // We do this by first starting with a known shape, then jumping to the associated type.
+        ITypeShape? ordinaryShape = providerUnderTest.Provider.GetShape(typeof(GenericDataType<int, string>));
+        Assert.NotNull(ordinaryShape);
+
+        // Fetch as an independent shape.
+        IObjectTypeShape? associatedShape = (IObjectTypeShape<ExtraShape2<int, string>>?)providerUnderTest.Provider.GetShape(typeof(ExtraShape2<int, string>));
+        Assert.NotNull(associatedShape);
+
+        // Fetch as an associated shape by its unbound generic.
+        associatedShape = (IObjectTypeShape<ExtraShape2<int, string>>?)ordinaryShape.GetAssociatedTypeShape(typeof(ExtraShape2<,>));
+        Assert.NotNull(associatedShape);
+
+        // Verify a wholly defined shape.
+        Assert.NotEmpty(associatedShape.Properties);
+
+        // Fetch as an associated shape by its closed generic.
+        associatedShape = (IObjectTypeShape<ExtraShape2<int, string>>?)ordinaryShape.GetAssociatedTypeShape(typeof(ExtraShape2<int, string>));
         Assert.NotNull(associatedShape);
     }
 
@@ -159,7 +204,19 @@ public abstract partial class AssociatedTypesTests(ProviderUnderTest providerUnd
     /// A class that should <em>not</em> be directly referenced by any other shaped type.
     /// It should have a shape generated for it, due to type extensions.
     /// </summary>
-    public class ExtraShape<T1, T2>;
+    public class ExtraShape<T1, T2>
+    {
+        public int MyProperty { get; set; }
+    }
+
+    /// <summary>
+    /// A class that should <em>not</em> be directly referenced by any other shaped type.
+    /// It should have a shape generated for it, due to type extensions.
+    /// </summary>
+    public class ExtraShape2<T1, T2>
+    {
+        public int MyProperty { get; set; }
+    }
 
     public class GenericWrapper<T1>
     {
@@ -174,9 +231,9 @@ public abstract partial class AssociatedTypesTests(ProviderUnderTest providerUnd
     [MyConverterNamedArg(Types = [typeof(CustomTypeConverter1), typeof(CustomTypeConverter2)])]
     internal partial class CustomTypeWithCustomConverter;
 
-    public class CustomTypeConverter;
-    public class CustomTypeConverter1;
-    public class CustomTypeConverter2;
+    public class CustomTypeConverter { public string? MyProperty { get; set; } }
+    public class CustomTypeConverter1 { public string? MyProperty { get; set; } }
+    public class CustomTypeConverter2 { public string? MyProperty { get; set; } }
 
     [AssociatedTypeAttribute(nameof(type), TypeShapeDepth.Constructor)]
     internal class MyConverterAttribute(Type type) : Attribute
