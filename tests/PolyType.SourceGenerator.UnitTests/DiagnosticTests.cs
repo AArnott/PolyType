@@ -283,12 +283,13 @@ public static class DiagnosticTests
     }
 
     [Fact]
+    [Trait("AssociatedTypes", "true")]
     public static void TypeShape_ArityMismatch_0to1()
     {
         Compilation compilation = CompilationHelpers.CreateCompilation("""
             using PolyType;
 
-            [TypeShape(AssociatedTypes = new[] { typeof(InternalAssociatedType<>) })]
+            [AssociatedTypeShape(typeof(InternalAssociatedType<>))]
             [GenerateShape]
             partial class MyPoco;
             public class InternalAssociatedType<T>;
@@ -306,12 +307,13 @@ public static class DiagnosticTests
 
 
     [Fact]
+    [Trait("AssociatedTypes", "true")]
     public static void TypeShape_ArityMismatch_2to1()
     {
         Compilation compilation = CompilationHelpers.CreateCompilation("""
             using PolyType;
 
-            [TypeShape(AssociatedTypes = new[] { typeof(InternalAssociatedType<>) })]
+            [AssociatedTypeShape(typeof(InternalAssociatedType<>))]
             partial class MyPoco<T1, T2>;
             public class InternalAssociatedType<T>;
 

@@ -83,41 +83,35 @@ public sealed partial class Parser : TypeDataModelGenerator
                     continue;
                 }
 
-                MergeAssociatedTypes(KnownSymbols.TypeShapeAssociatedTypesPropertyName, TypeShapeDepth.Constructor);
-                MergeAssociatedTypes(KnownSymbols.TypeShapeAssociatedShapesPropertyName, TypeShapeDepth.All);
-
-                void MergeAssociatedTypes(string propertyName, TypeShapeDepth requirement)
+                TypeShapeDepth typeShapeDepth = attribute.TryGetNamedArgument(PolyTypeKnownSymbols.TypeShapeExtensionAttributePropertyNames.AssociatedShapeDepth, out TypeShapeDepth depth) ? depth : TypeShapeDepth.All;
+                if (attribute.TryGetNamedArguments(PolyTypeKnownSymbols.TypeShapeExtensionAttributePropertyNames.AssociatedTypes, out ImmutableArray<TypedConstant> associatedTypesArg))
                 {
-                    var associatedTypesNamedArg = attribute.NamedArguments.FirstOrDefault(kv => kv.Key == propertyName);
-                    if (associatedTypesNamedArg.Key is not null && associatedTypesNamedArg.Value is { Kind: TypedConstantKind.Array, Values: { IsDefaultOrEmpty: false } associatedTypesArg })
+                    List<AssociatedTypeModel> associatedTypeSymbols = new(associatedTypesArg.Length);
+                    foreach (TypedConstant tc in associatedTypesArg)
                     {
-                        List<AssociatedTypeModel> associatedTypeSymbols = new(associatedTypesArg.Length);
-                        foreach (TypedConstant tc in associatedTypesArg)
+                        if (tc.Value is INamedTypeSymbol associatedType)
                         {
-                            if (tc.Value is INamedTypeSymbol associatedType)
-                            {
-                                associatedTypeSymbols.Add(new AssociatedTypeModel(associatedType, assemblySymbol, attribute.GetLocation(), requirement));
-                            }
+                            associatedTypeSymbols.Add(new AssociatedTypeModel(associatedType, assemblySymbol, attribute.GetLocation(), typeShapeDepth));
                         }
+                    }
 
-                        if (associatedTypeSymbols.Count > 0)
+                    if (associatedTypeSymbols.Count > 0)
+                    {
+                        if (!associatedTypes.TryGetValue(targetType, out TypeExtensionModel? existingRelatedTypes))
                         {
-                            if (!associatedTypes.TryGetValue(targetType, out TypeExtensionModel? existingRelatedTypes))
+                            existingRelatedTypes = new TypeExtensionModel
                             {
-                                existingRelatedTypes = new TypeExtensionModel
-                                {
-                                    Target = targetType,
-                                    AssociatedTypes = ImmutableArray<AssociatedTypeModel>.Empty,
-                                };
-                            }
-
-                            existingRelatedTypes = existingRelatedTypes with
-                            {
-                                AssociatedTypes = existingRelatedTypes.AssociatedTypes.AddRange(associatedTypeSymbols),
+                                Target = targetType,
+                                AssociatedTypes = ImmutableArray<AssociatedTypeModel>.Empty,
                             };
-
-                            associatedTypes[targetType] = existingRelatedTypes;
                         }
+
+                        existingRelatedTypes = existingRelatedTypes with
+                        {
+                            AssociatedTypes = existingRelatedTypes.AssociatedTypes.AddRange(associatedTypeSymbols),
+                        };
+
+                        associatedTypes[targetType] = existingRelatedTypes;
                     }
                 }
             }

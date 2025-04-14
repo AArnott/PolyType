@@ -5,6 +5,7 @@ using PolyType.SourceGenerator.Helpers;
 using PolyType.SourceGenerator.Model;
 using System.Collections.Immutable;
 using System.Diagnostics;
+using System.Reflection.Metadata;
 
 namespace PolyType.SourceGenerator;
 
@@ -676,7 +677,7 @@ public sealed partial class Parser
 
                 if (SymbolEqualityComparer.Default.Equals(att.AttributeClass, _knownSymbols.AssociatedTypeAttributeAttribute))
                 {
-                    if (att.ConstructorArguments is [{ Value: string name }, { Value: int requirements}])
+                    if (att.ConstructorArguments is [{ Value: string name }, { Value: int requirements }])
                     {
                         names.Add(name, (TypeShapeDepth)requirements);
                     }
@@ -697,12 +698,9 @@ public sealed partial class Parser
         kind = null;
         marshaller = null;
         location = null;
-        associatedTypes = ImmutableArray<AssociatedTypeModel>.Empty;
 
         if (typeSymbol.GetAttribute(_knownSymbols.TypeShapeAttribute) is AttributeData propertyAttr)
         {
-            location = propertyAttr.GetLocation();
-            Location? localLocation = location;
             foreach (KeyValuePair<string, TypedConstant> namedArgument in propertyAttr.NamedArguments)
             {
                 switch (namedArgument.Key)
@@ -713,26 +711,27 @@ public sealed partial class Parser
                     case "Marshaller":
                         marshaller = namedArgument.Value.Value as ITypeSymbol;
                         break;
-                    case KnownSymbols.TypeShapeAssociatedTypesPropertyName:
-                        if (namedArgument.Value.Values is { Length: > 0 } associatedTypesArray)
-                        {
-                            associatedTypes = ImmutableArray.CreateRange(
-                                from tc in associatedTypesArray
-                                where tc.Value is INamedTypeSymbol s
-                                select new AssociatedTypeModel((INamedTypeSymbol)tc.Value!, typeSymbol.ContainingAssembly, localLocation, TypeShapeDepth.Constructor));
-                        }
+                }
+            }
+        }
 
-                        break;
-                    case KnownSymbols.TypeShapeAssociatedShapesPropertyName:
-                        if (namedArgument.Value.Values is { Length: > 0 } associatedShapesArray)
-                        {
-                            associatedTypes = ImmutableArray.CreateRange(
-                                from tc in associatedShapesArray
-                                where tc.Value is INamedTypeSymbol s
-                                select new AssociatedTypeModel((INamedTypeSymbol)tc.Value!, typeSymbol.ContainingAssembly, localLocation, TypeShapeDepth.All));
-                        }
+        ParseCustomAssociatedTypeAttributes(typeSymbol, out associatedTypes);
 
-                        break;
+        foreach (AttributeData associatedTypeAttr in typeSymbol.GetAttributes())
+        {
+            if (SymbolEqualityComparer.Default.Equals(associatedTypeAttr.AttributeClass, _knownSymbols.AssociatedTypeShapeAttribute))
+            {
+                location = associatedTypeAttr.GetLocation();
+                Location? localLocation = location;
+
+                TypeShapeDepth depth = associatedTypeAttr.TryGetNamedArgument(PolyTypeKnownSymbols.AssociatedTypeShapeAttributePropertyNames.Requirements, out TypeShapeDepth depthArg)
+                    ? depthArg : TypeShapeDepth.All;
+                if (associatedTypeAttr.TryGetNamedArguments(PolyTypeKnownSymbols.AssociatedTypeShapeAttributePropertyNames.AssociatedTypes, out ImmutableArray<TypedConstant> types))
+                {
+                    associatedTypes = ImmutableArray.CreateRange(associatedTypes.Concat(
+                        from tc in types
+                        where tc.Value is INamedTypeSymbol s
+                        select new AssociatedTypeModel((INamedTypeSymbol)tc.Value!, typeSymbol.ContainingAssembly, localLocation, TypeShapeDepth.Constructor)));
                 }
             }
         }
