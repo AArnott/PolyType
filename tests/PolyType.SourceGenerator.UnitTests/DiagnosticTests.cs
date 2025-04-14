@@ -279,7 +279,7 @@ public static class DiagnosticTests
         Assert.Equal("PT0005", diagnostic.Id);
         Assert.Equal(DiagnosticSeverity.Warning, diagnostic.Severity);
         Assert.Equal((4, 5), diagnostic.Location.GetStartPosition());
-        Assert.Equal((4, 74), diagnostic.Location.GetEndPosition());
+        Assert.Equal((4, 56), diagnostic.Location.GetEndPosition());
     }
 
     [Fact]
@@ -302,7 +302,7 @@ public static class DiagnosticTests
         Assert.Equal("PT0016", diagnostic.Id);
         Assert.Equal(DiagnosticSeverity.Error, diagnostic.Severity);
         Assert.Equal((2, 1), diagnostic.Location.GetStartPosition());
-        Assert.Equal((2, 72), diagnostic.Location.GetEndPosition());
+        Assert.Equal((2, 54), diagnostic.Location.GetEndPosition());
     }
 
 
@@ -328,7 +328,7 @@ public static class DiagnosticTests
         Assert.Equal("PT0016", diagnostic.Id);
         Assert.Equal(DiagnosticSeverity.Error, diagnostic.Severity);
         Assert.Equal((2, 1), diagnostic.Location.GetStartPosition());
-        Assert.Equal((2, 72), diagnostic.Location.GetEndPosition());
+        Assert.Equal((2, 54), diagnostic.Location.GetEndPosition());
     }
 
     [Theory]

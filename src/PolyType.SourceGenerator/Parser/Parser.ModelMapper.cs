@@ -726,12 +726,12 @@ public sealed partial class Parser
 
                 TypeShapeDepth depth = associatedTypeAttr.TryGetNamedArgument(PolyTypeKnownSymbols.AssociatedTypeShapeAttributePropertyNames.Requirements, out TypeShapeDepth depthArg)
                     ? depthArg : TypeShapeDepth.All;
-                if (associatedTypeAttr.TryGetNamedArguments(PolyTypeKnownSymbols.AssociatedTypeShapeAttributePropertyNames.AssociatedTypes, out ImmutableArray<TypedConstant> types))
+                if (associatedTypeAttr.ConstructorArguments is [{ Kind: TypedConstantKind.Array, Values: { } typeArgs }, ..])
                 {
                     associatedTypes = ImmutableArray.CreateRange(associatedTypes.Concat(
-                        from tc in types
+                        from tc in typeArgs
                         where tc.Value is INamedTypeSymbol s
-                        select new AssociatedTypeModel((INamedTypeSymbol)tc.Value!, typeSymbol.ContainingAssembly, localLocation, TypeShapeDepth.Constructor)));
+                        select new AssociatedTypeModel((INamedTypeSymbol)tc.Value!, typeSymbol.ContainingAssembly, localLocation, depth)));
                 }
             }
         }

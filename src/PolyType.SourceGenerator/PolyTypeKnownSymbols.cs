@@ -20,7 +20,6 @@ public sealed class PolyTypeKnownSymbols(Compilation compilation) : KnownSymbols
     public static class AssociatedTypeShapeAttributePropertyNames
     {
         public const string Requirements = "Requirements";
-        public const string AssociatedTypes = "AssociatedTypes";
     }
 
     public INamedTypeSymbol? GenerateShapeAttribute => GetOrResolveType("PolyType.GenerateShapeAttribute", ref _GenerateShapeAttribute);
@@ -35,11 +34,11 @@ public sealed class PolyTypeKnownSymbols(Compilation compilation) : KnownSymbols
     public INamedTypeSymbol? TypeShapeExtensionAttribute => GetOrResolveType("PolyType.TypeShapeExtensionAttribute", ref _TypeShapeExtensionAttribute);
     private Option<INamedTypeSymbol?> _TypeShapeExtensionAttribute;
 
+    public INamedTypeSymbol? AssociatedTypeShapeAttribute => GetOrResolveType("PolyType.AssociatedTypeShapeAttribute", ref _AssociatedTypeShapeAttribute);
+    private Option<INamedTypeSymbol?> _AssociatedTypeShapeAttribute;
+
     public INamedTypeSymbol? AssociatedTypeAttributeAttribute => GetOrResolveType("PolyType.Abstractions.AssociatedTypeAttributeAttribute", ref _AssociatedTypeAttributeAttribute);
     private Option<INamedTypeSymbol?> _AssociatedTypeAttributeAttribute;
-
-    public INamedTypeSymbol? AssociatedTypeShapeAttribute => GetOrResolveType("PolyType.Abstractions.AssociatedTypeShapeAttribute", ref _AssociatedTypeShapeAttribute);
-    private Option<INamedTypeSymbol?> _AssociatedTypeShapeAttribute;
 
     public INamedTypeSymbol? PropertyShapeAttribute => GetOrResolveType("PolyType.PropertyShapeAttribute", ref _PropertyShapeAttribute);
     private Option<INamedTypeSymbol?> _PropertyShapeAttribute;
