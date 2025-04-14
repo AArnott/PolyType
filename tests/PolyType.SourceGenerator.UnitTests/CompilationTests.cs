@@ -59,7 +59,7 @@ public static class CompilationTests
         Compilation compilation = CompilationHelpers.CreateCompilation("""
             using PolyType;
 
-            [assembly: TypeShapeExtension(typeof(GenericClass<,>), AssociatedTypes = [typeof(GenericConverter<,>)])]
+            [assembly: TypeShapeExtension(typeof(GenericClass<,>), AssociatedShapeDepth = TypeShapeDepth.Constructor, AssociatedTypes = [typeof(GenericConverter<,>)])]
 
             public class GenericClass<T1, T2>;
             public class GenericConverter<T1, T2>;

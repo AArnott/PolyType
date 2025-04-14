@@ -1,4 +1,4 @@
-namespace PolyType.Abstractions;
+namespace PolyType;
 
 /// <summary>
 /// Describes the requirements for preparing an associated type.
