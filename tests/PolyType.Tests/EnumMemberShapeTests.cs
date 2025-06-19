@@ -21,7 +21,11 @@ public abstract partial class EnumMemberShapeTests(ProviderUnderTest providerUnd
         Assert.True(enumShape.IsDefinedValueOrCombinationOfValues(TestEnum.Second));
         Assert.False(enumShape.IsDefinedValueOrCombinationOfValues((TestEnum)3));
         Assert.True(enumShape.IsDefinedValueOrCombinationOfValues(TestEnum.Third));
+    }
 
+    [Fact]
+    public void IsDefinedValueOrCombinationOfValues_Flags()
+    {
         var enumFlagsShape = (IEnumTypeShape<TestFlagsEnum, int>)providerUnderTest.Provider.Resolve<TestFlagsEnum>();
         Assert.True(enumFlagsShape.IsDefinedValueOrCombinationOfValues(TestFlagsEnum.One));
         Assert.True(enumFlagsShape.IsDefinedValueOrCombinationOfValues(TestFlagsEnum.Three));
@@ -39,7 +43,11 @@ public abstract partial class EnumMemberShapeTests(ProviderUnderTest providerUnd
         Assert.Equal(3, remainingByte);
         Assert.Equal(["3rd"], enumShape.EnumerateContributingFlags(TestEnum.Third, out remainingByte));
         Assert.Equal(0, remainingByte);
+    }
 
+    [Fact]
+    public void EnumerateContributingFlags_Flags()
+    {
         var enumFlagsShape = (IEnumTypeShape<TestFlagsEnum, int>)providerUnderTest.Provider.Resolve<TestFlagsEnum>();
         Assert.Equal([nameof(TestFlagsEnum.One)], enumFlagsShape.EnumerateContributingFlags(TestFlagsEnum.One, out int remainingInt));
         Assert.Equal(0, remainingInt);
@@ -59,7 +67,11 @@ public abstract partial class EnumMemberShapeTests(ProviderUnderTest providerUnd
         var enumShape = (IEnumTypeShape<TestEnum, byte>)providerUnderTest.Provider.Resolve<TestEnum>();
         Assert.Equal(TestEnum.First, enumShape.AggregateContributingFlags(["FirstValue"]));
         Assert.Equal(TestEnum.Third, enumShape.AggregateContributingFlags(["3rd"]));
+    }
 
+    [Fact]
+    public void AggregateContributingFlags_Flags()
+    {
         var enumFlagsShape = (IEnumTypeShape<TestFlagsEnum, int>)providerUnderTest.Provider.Resolve<TestFlagsEnum>();
         Assert.Equal(TestFlagsEnum.One, enumFlagsShape.AggregateContributingFlags(["One"]));
         Assert.Equal(TestFlagsEnum.Two, enumFlagsShape.AggregateContributingFlags(["two"]));
