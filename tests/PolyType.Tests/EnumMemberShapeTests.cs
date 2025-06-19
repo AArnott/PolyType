@@ -53,6 +53,20 @@ public abstract partial class EnumMemberShapeTests(ProviderUnderTest providerUnd
         Assert.Equal(0x10, remainingInt);
     }
 
+    [Fact]
+    public void AggregateContributingFlags()
+    {
+        var enumShape = (IEnumTypeShape<TestEnum, byte>)providerUnderTest.Provider.Resolve<TestEnum>();
+        Assert.Equal(TestEnum.First, enumShape.AggregateContributingFlags(["FirstValue"]));
+        Assert.Equal(TestEnum.Third, enumShape.AggregateContributingFlags(["3rd"]));
+
+        var enumFlagsShape = (IEnumTypeShape<TestFlagsEnum, int>)providerUnderTest.Provider.Resolve<TestFlagsEnum>();
+        Assert.Equal(TestFlagsEnum.One, enumFlagsShape.AggregateContributingFlags(["One"]));
+        Assert.Equal(TestFlagsEnum.Two, enumFlagsShape.AggregateContributingFlags(["two"]));
+        Assert.Equal(TestFlagsEnum.TwoAndThree, enumFlagsShape.AggregateContributingFlags(["TwoAndThree"]));
+        Assert.Equal(TestFlagsEnum.TwoAndThree, enumFlagsShape.AggregateContributingFlags(["two", "Three"]));
+    }
+
     public enum TestEnum : byte
     {
         [EnumMemberShape(Name = "FirstValue")]

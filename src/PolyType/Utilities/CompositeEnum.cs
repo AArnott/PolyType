@@ -21,6 +21,11 @@ public static class CompositeEnum
         where TEnum : struct, Enum
         where TUnderlying : unmanaged
     {
+        if (shape is null)
+        {
+            throw new ArgumentNullException(nameof(shape));
+        }
+
         ulong valueAsULong = ConvertToUInt64<TEnum, TUnderlying>(value);
         if (EnumData<TEnum>.IsFlagsEnum)
         {
@@ -64,6 +69,32 @@ public static class CompositeEnum
     }
 
     /// <summary>
+    /// Aggregates a set of named enum values into one enum value.
+    /// </summary>
+    /// <typeparam name="TEnum">The enum type.</typeparam>
+    /// <typeparam name="TUnderlying">The underlying type of the enum.</typeparam>
+    /// <param name="shape">The enum shape.</param>
+    /// <param name="valueNames">The set of enum value names to aggregate.</param>
+    /// <returns>The aggregation of the named values.</returns>
+    public static TEnum AggregateContributingFlags<TEnum, TUnderlying>(this IEnumTypeShape<TEnum, TUnderlying> shape, ReadOnlySpan<string> valueNames)
+        where TEnum : struct, Enum
+        where TUnderlying : unmanaged
+    {
+        if (shape is null)
+        {
+            throw new ArgumentNullException(nameof(shape));
+        }
+
+        ulong result = 0;
+        for (int i = 0; i < valueNames.Length; i++)
+        {
+            result |= ConvertToUInt64(shape.Members[valueNames[i]]);
+        }
+
+        return (TEnum)(object)ConvertFromUInt64<TUnderlying>(result);
+    }
+
+    /// <summary>
     /// Gets a value indicating whether the specified enum value is defined in the enum type shape.
     /// </summary>
     /// <typeparam name="TEnum">The enum type.</typeparam>
@@ -76,6 +107,11 @@ public static class CompositeEnum
         where TEnum : struct, Enum
         where TUnderlying : unmanaged
     {
+        if (shape is null)
+        {
+            throw new ArgumentNullException(nameof(shape));
+        }
+
         if (!EnumData<TEnum>.IsInteger)
         {
             throw new InvalidOperationException($"The type {typeof(TEnum).FullName} must be backed by an integral type to use this method.");
