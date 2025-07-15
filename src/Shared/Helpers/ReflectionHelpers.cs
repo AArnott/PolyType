@@ -368,7 +368,7 @@ internal static class ReflectionHelpers
                     spanElementType == typeParameter)
                 {
                     MethodInfo specializedMethod = method.MakeGenericMethod(elementType);
-                    if (specializedMethod.ReturnType == type)
+                    if (type.IsAssignableFrom(specializedMethod.ReturnType))
                     {
                         builderMethod = specializedMethod;
 

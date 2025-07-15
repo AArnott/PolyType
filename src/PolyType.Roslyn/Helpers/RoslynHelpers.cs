@@ -259,7 +259,7 @@ internal static class RoslynHelpers
                     cmp.Equals(spanElementType, typeParameter))
                 {
                     IMethodSymbol specializedMethod = method.Construct(elementType);
-                    if (cmp.Equals(specializedMethod.ReturnType, type))
+                    if (type.IsAssignableFrom(specializedMethod.ReturnType))
                     {
                         builderMethod = specializedMethod;
                         // Continue searching since we prefer non-generic methods.
