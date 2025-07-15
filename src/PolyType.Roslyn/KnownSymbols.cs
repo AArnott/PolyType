@@ -177,6 +177,12 @@ public class KnownSymbols(Compilation compilation)
     private Option<INamedTypeSymbol?> _ImmutableHashSet;
 
     /// <summary>
+    /// The type symbol for <see cref="System.Collections.Immutable.IImmutableSet{T}"/>.
+    /// </summary>
+    public INamedTypeSymbol? IImmutableSet => GetOrResolveType("System.Collections.Immutable.IImmutableSet`1", ref _IImmutableSet);
+    private Option<INamedTypeSymbol?> _IImmutableSet;
+
+    /// <summary>
     /// The type symbol for <see cref="System.Collections.Immutable.ImmutableSortedSet{T}"/>.
     /// </summary>
     public INamedTypeSymbol? ImmutableSortedSet => GetOrResolveType("System.Collections.Immutable.ImmutableSortedSet`1", ref _ImmutableSortedSet);

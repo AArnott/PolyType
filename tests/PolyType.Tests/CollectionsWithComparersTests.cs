@@ -1,4 +1,5 @@
 ﻿using System.Collections;
+using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Collections.ObjectModel;
 using System.Diagnostics.CodeAnalysis;
@@ -79,6 +80,15 @@ public abstract partial class CollectionsWithComparersTests(ProviderUnderTest pr
     public void ImmutableHashSet()
     {
         this.AssertSpanEnumerable<ImmutableHashSet<int>, int>(NonEmptyEnumerable, new EvenOddEqualityComparer(), s => s.KeyComparer);
+    }
+
+    // REVISIT: This test is skipped for no-emit Reflection because it uses Span, which isn't supported by that provider.
+    //          Consider adding an array/list construction strategy for better support.
+    [Fact]
+    public void IImmutableSet()
+    {
+        var enumerable = this.CreateSpanEnumerable<IImmutableSet<int>, int>([3, 6, 7], new EvenOddEqualityComparer());
+        AssertEquivalentContent([3, 6], enumerable);
     }
 
     // REVISIT: This test is skipped for no-emit Reflection because it uses Span, which isn't supported by that provider.
@@ -410,6 +420,7 @@ public abstract partial class CollectionsWithComparersTests(ProviderUnderTest pr
     [GenerateShapeFor<SortedSet<int>>]
     [GenerateShapeFor<ImmutableHashSet<int>>]
     [GenerateShapeFor<ImmutableSortedSet<int>>]
+    [GenerateShapeFor<IImmutableSet<int>>]
     [GenerateShapeFor<HashSet<IEqualityComparer<int>>>]
     [GenerateShapeFor<Dictionary<IEqualityComparer<int>, int>>]
     [GenerateShapeFor<ReadOnlyMemory<int>>]

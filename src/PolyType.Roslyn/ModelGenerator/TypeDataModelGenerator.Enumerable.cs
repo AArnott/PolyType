@@ -301,6 +301,11 @@ public partial class TypeDataModelGenerator
                 return FindCreateRangeMethods("System.Collections.Immutable.ImmutableHashSet", true);
             }
 
+            if (SymbolEqualityComparer.Default.Equals(namedType.ConstructedFrom, KnownSymbols.IImmutableSet))
+            {
+                return FindCreateRangeMethods("System.Collections.Immutable.ImmutableHashSet", true);
+            }
+
             if (SymbolEqualityComparer.Default.Equals(namedType.ConstructedFrom, KnownSymbols.ImmutableSortedSet))
             {
                 return FindCreateRangeMethods("System.Collections.Immutable.ImmutableSortedSet", false);
