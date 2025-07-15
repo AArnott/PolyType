@@ -199,12 +199,16 @@ public static class TestTypes
         yield return TestCase.Create(ImmutableArray.Create(1, 2, 1, 3), p);
         yield return TestCase.Create(ImmutableList.Create("1", "2", "1", "3"), p);
         yield return TestCase.Create(ImmutableList.Create("1", "2", null), p);
+        yield return TestCase.Create((IImmutableList<string>)ImmutableList.Create("1", "2", "1", "3"), p);
         yield return TestCase.Create(ImmutableQueue.Create(1, 2, 1, 3), p);
         yield return TestCase.Create(ImmutableStack.Create(1, 2, 1, 3), isStack: true, provider: p);
+        yield return TestCase.Create((IImmutableStack<int>)ImmutableStack.Create(1, 2, 1, 3), isStack: true, provider: p);
         yield return TestCase.Create(ImmutableHashSet.Create(1, 2, 1, 3), p);
         yield return TestCase.Create(ImmutableSortedSet.Create(1, 2, 1, 3), p);
+        yield return TestCase.Create((IImmutableSet<int>)ImmutableHashSet.Create(1, 2, 1, 3), p);
         yield return TestCase.Create(ImmutableDictionary.CreateRange(new Dictionary<string, string> { ["key"] = "value" }), p);
         yield return TestCase.Create(ImmutableDictionary.CreateRange(new Dictionary<string, string?> { ["key"] = null }), p);
+        yield return TestCase.Create((IImmutableDictionary<string, string?>)ImmutableDictionary.CreateRange(new Dictionary<string, string?> { ["key"] = null }), p);
         yield return TestCase.Create(ImmutableSortedDictionary.CreateRange(new Dictionary<string, string> { ["key"] = "value" }), p);
         yield return TestCase.Create(Enumerable.Range(1, 5).Select(i => i.ToString(CultureInfo.InvariantCulture)).ToFrozenDictionary(i => i, i => i), p);
         yield return TestCase.Create(Enumerable.Range(1, 5).ToFrozenSet(), p);
@@ -2588,12 +2592,16 @@ public partial class AsyncEnumerableClass(IEnumerable<int> values) : IAsyncEnume
 [GenerateShapeFor<GenericStructWithInitOnlyProperty<GenericStructWithInitOnlyProperty<string>>>]
 [GenerateShapeFor<ImmutableArray<int>>]
 [GenerateShapeFor<ImmutableList<string>>]
+[GenerateShapeFor<IImmutableList<string>>]
 [GenerateShapeFor<ImmutableQueue<int>>]
 [GenerateShapeFor<ImmutableStack<int>>]
+[GenerateShapeFor<IImmutableStack<int>>]
 [GenerateShapeFor<ImmutableHashSet<int>>]
 [GenerateShapeFor<ImmutableSortedSet<int>>]
+[GenerateShapeFor<IImmutableSet<int>>]
 [GenerateShapeFor<ImmutableDictionary<string, string>>]
 [GenerateShapeFor<ImmutableSortedDictionary<string, string>>]
+[GenerateShapeFor<IImmutableDictionary<string, string>>]
 [GenerateShapeFor<FrozenDictionary<string, string>>]
 [GenerateShapeFor<FrozenSet<int>>]
 [GenerateShapeFor<IEnumerable>]
