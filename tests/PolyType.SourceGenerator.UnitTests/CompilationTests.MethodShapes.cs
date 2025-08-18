@@ -384,6 +384,33 @@ public static partial class CompilationTests
         Assert.Empty(result.Diagnostics);
     }
 
+    [Fact]
+    public static void AmbiguousMethodInheritanceOnInterface()
+    {
+        Compilation compilation = CompilationHelpers.CreateCompilation("""
+            using PolyType;
+
+            public interface IBase1
+            {
+                void DoSomething();
+            }
+
+            public interface IBase2
+            {
+                void DoSomething();
+            }
+
+            [GenerateShape(IncludeMethods = MethodShapeFlags.PublicInstance)]
+            public partial interface IDerived : IBase1, IBase2
+            {
+                // This will cause an ambiguity error if not handled correctly
+            }
+            """);
+
+        PolyTypeSourceGeneratorResult result = CompilationHelpers.RunPolyTypeSourceGenerator(compilation);
+        Assert.Empty(result.Diagnostics);
+    }
+
     [Theory]
     [InlineData("public ref int GetRef(ref int value) => ref value;")]
     [InlineData("public ref readonly int GetRefReadonly(ref readonly int value) => ref value;")]
