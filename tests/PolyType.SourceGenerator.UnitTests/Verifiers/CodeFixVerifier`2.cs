@@ -50,6 +50,7 @@ internal class CodeFixVerifier<TAnalyzer, TCodeFix>
         {
             TestCode = source,
             FixedCode = fixedSource,
+            TestBehaviors = TestBehaviors.SkipGeneratedSourcesCheck,
         };
 
         test.ExpectedDiagnostics.AddRange(expected);
@@ -60,6 +61,7 @@ internal class CodeFixVerifier<TAnalyzer, TCodeFix>
     {
         var test = new Test
         {
+            TestBehaviors = TestBehaviors.SkipGeneratedSourcesCheck,
         };
 
         foreach (var src in source)

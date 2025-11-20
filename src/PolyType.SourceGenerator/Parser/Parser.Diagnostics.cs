@@ -162,4 +162,15 @@ public sealed partial class Parser
         category: "PolyType.SourceGenerator",
         defaultSeverity: DiagnosticSeverity.Warning,
         isEnabledByDefault: true);
+
+    internal static DiagnosticDescriptor MissingDefaultValueAttribute { get; } = new DiagnosticDescriptor(
+        id: "PT0023",
+        title: "Member has initializer but no DefaultValueAttribute.",
+        messageFormat: 
+            "The member '{0}' on type '{1}' has an initializer but no DefaultValueAttribute. " +
+            "Consider adding [DefaultValue({2})] to make the default value explicit in the type shape.",
+
+        category: "Usage",
+        defaultSeverity: DiagnosticSeverity.Warning,
+        isEnabledByDefault: true);
 }
