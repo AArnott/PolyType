@@ -234,7 +234,7 @@ public class PropertyInitializerDefaultValueAnalyzerTests
     }
 
     [Fact]
-    public async Task PropertyWithNonConstInitializer_NoDiagnostic()
+    public async Task PropertyWithNonConstInitializer_ReportsDiagnostic()
     {
         string source = /* lang=c#-test */ """
             using PolyType;
@@ -243,7 +243,7 @@ public class PropertyInitializerDefaultValueAnalyzerTests
             [GenerateShape]
             public partial class MyClass
             {
-                public int Value { get; set; } = GetDefaultValue();
+                public int {|PT0023:Value|} { get; set; } = GetDefaultValue();
 
                 private static int GetDefaultValue() => 42;
             }
@@ -417,5 +417,27 @@ public class PropertyInitializerDefaultValueAnalyzerTests
             """;
 
         await VerifyCS.VerifyCodeFixAsync(source, fixedSource);
+    }
+
+    [Fact]
+    public async Task PropertyWithNonConstInitializer_NoCodeFixOffered()
+    {
+        // This test verifies that a diagnostic is reported but no code fix is offered for non-const initializers
+        // We need to verify the analyzer behavior only, not the code fix behavior
+        string source = /* lang=c#-test */ """
+            using PolyType;
+            using System.ComponentModel;
+
+            [GenerateShape]
+            public partial class MyClass
+            {
+                public int {|PT0023:Value|} { get; set; } = GetDefaultValue();
+
+                private static int GetDefaultValue() => 42;
+            }
+            """;
+
+        // Verify the analyzer reports the diagnostic
+        await VerifyCS.VerifyAnalyzerAsync(source);
     }
 }

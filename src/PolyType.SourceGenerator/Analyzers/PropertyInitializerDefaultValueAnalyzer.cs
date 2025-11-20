@@ -116,12 +116,8 @@ public class PropertyInitializerDefaultValueAnalyzer : DiagnosticAnalyzer
             return;
         }
 
-        // Get the initializer value as a string
-        string? initializerValue = GetInitializerValueAsString(propertySyntax.Initializer.Value, context.SemanticModel, context.CancellationToken);
-        if (initializerValue is null)
-        {
-            return;
-        }
+        // Get the initializer value as a string for the diagnostic message
+        string initializerValue = GetInitializerValueAsString(propertySyntax.Initializer.Value, context.SemanticModel, context.CancellationToken);
 
         // Report diagnostic
         var diagnostic = Diagnostic.Create(
@@ -179,12 +175,8 @@ public class PropertyInitializerDefaultValueAnalyzer : DiagnosticAnalyzer
                 continue;
             }
 
-            // Get the initializer value as a string
-            string? initializerValue = GetInitializerValueAsString(variable.Initializer.Value, context.SemanticModel, context.CancellationToken);
-            if (initializerValue is null)
-            {
-                continue;
-            }
+            // Get the initializer value as a string for the diagnostic message
+            string initializerValue = GetInitializerValueAsString(variable.Initializer.Value, context.SemanticModel, context.CancellationToken);
 
             // Report diagnostic
             var diagnostic = Diagnostic.Create(
@@ -198,15 +190,20 @@ public class PropertyInitializerDefaultValueAnalyzer : DiagnosticAnalyzer
         }
     }
 
-    private static string? GetInitializerValueAsString(ExpressionSyntax expression, SemanticModel semanticModel, CancellationToken cancellationToken)
+    private static string GetInitializerValueAsString(ExpressionSyntax expression, SemanticModel semanticModel, CancellationToken cancellationToken)
     {
-        // Try to evaluate the expression as a constant
+        // Try to evaluate the expression as a constant for the diagnostic message
         var constantValue = semanticModel.GetConstantValue(expression, cancellationToken);
         if (constantValue.HasValue)
         {
-            return Roslyn.Helpers.RoslynHelpers.FormatPrimitiveConstant(semanticModel.GetTypeInfo(expression, cancellationToken).Type, constantValue.Value);
+            string? formattedValue = Roslyn.Helpers.RoslynHelpers.FormatPrimitiveConstant(semanticModel.GetTypeInfo(expression, cancellationToken).Type, constantValue.Value);
+            if (formattedValue is not null)
+            {
+                return formattedValue;
+            }
         }
 
-        return null;
+        // If we can't format it as a const, use the expression text
+        return expression.ToString();
     }
 }
