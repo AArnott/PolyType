@@ -43,60 +43,62 @@ public class PropertyInitializerDefaultValueCodeFixProvider : CodeFixProvider
         }
 
         // Navigate to the property or field declaration
-        PropertyDeclarationSyntax? propertyDecl = node.AncestorsAndSelf().OfType<PropertyDeclarationSyntax>().FirstOrDefault();
-        VariableDeclaratorSyntax? fieldDecl = node.AncestorsAndSelf().OfType<VariableDeclaratorSyntax>().FirstOrDefault();
-
-        if (propertyDecl is not null && propertyDecl.Initializer is not null)
+        foreach (var ancestor in node.AncestorsAndSelf())
         {
-            // Check if the initializer is a constant value
-            var constantValue = semanticModel.GetConstantValue(propertyDecl.Initializer.Value, context.CancellationToken);
-            if (!constantValue.HasValue)
+            if (ancestor is PropertyDeclarationSyntax propertyDecl && propertyDecl.Initializer is not null)
             {
-                // Only offer code fix for const initializers
+                // Check if the initializer is a constant value
+                var constantValue = semanticModel.GetConstantValue(propertyDecl.Initializer.Value, context.CancellationToken);
+                if (!constantValue.HasValue)
+                {
+                    // Only offer code fix for const initializers
+                    return;
+                }
+
+                string? initializerValue = Roslyn.Helpers.RoslynHelpers.FormatPrimitiveConstant(
+                    semanticModel.GetTypeInfo(propertyDecl.Initializer.Value, context.CancellationToken).Type,
+                    constantValue.Value);
+
+                if (initializerValue is null)
+                {
+                    return;
+                }
+
+                context.RegisterCodeFix(
+                    CodeAction.Create(
+                        title: Title,
+                        createChangedDocument: c => AddDefaultValueAttributeToPropertyAsync(context.Document, propertyDecl, initializerValue, c),
+                        equivalenceKey: Title),
+                    diagnostic);
                 return;
             }
-
-            string? initializerValue = Roslyn.Helpers.RoslynHelpers.FormatPrimitiveConstant(
-                semanticModel.GetTypeInfo(propertyDecl.Initializer.Value, context.CancellationToken).Type,
-                constantValue.Value);
-
-            if (initializerValue is null)
+            else if (ancestor is VariableDeclaratorSyntax fieldDecl && fieldDecl.Initializer is not null)
             {
+                // Check if the initializer is a constant value
+                var constantValue = semanticModel.GetConstantValue(fieldDecl.Initializer.Value, context.CancellationToken);
+                if (!constantValue.HasValue)
+                {
+                    // Only offer code fix for const initializers
+                    return;
+                }
+
+                string? initializerValue = Roslyn.Helpers.RoslynHelpers.FormatPrimitiveConstant(
+                    semanticModel.GetTypeInfo(fieldDecl.Initializer.Value, context.CancellationToken).Type,
+                    constantValue.Value);
+
+                if (initializerValue is null)
+                {
+                    return;
+                }
+
+                context.RegisterCodeFix(
+                    CodeAction.Create(
+                        title: Title,
+                        createChangedDocument: c => AddDefaultValueAttributeToFieldAsync(context.Document, fieldDecl, initializerValue, c),
+                        equivalenceKey: Title),
+                    diagnostic);
                 return;
             }
-
-            context.RegisterCodeFix(
-                CodeAction.Create(
-                    title: Title,
-                    createChangedDocument: c => AddDefaultValueAttributeToPropertyAsync(context.Document, propertyDecl, initializerValue, c),
-                    equivalenceKey: Title),
-                diagnostic);
-        }
-        else if (fieldDecl is not null && fieldDecl.Initializer is not null)
-        {
-            // Check if the initializer is a constant value
-            var constantValue = semanticModel.GetConstantValue(fieldDecl.Initializer.Value, context.CancellationToken);
-            if (!constantValue.HasValue)
-            {
-                // Only offer code fix for const initializers
-                return;
-            }
-
-            string? initializerValue = Roslyn.Helpers.RoslynHelpers.FormatPrimitiveConstant(
-                semanticModel.GetTypeInfo(fieldDecl.Initializer.Value, context.CancellationToken).Type,
-                constantValue.Value);
-
-            if (initializerValue is null)
-            {
-                return;
-            }
-
-            context.RegisterCodeFix(
-                CodeAction.Create(
-                    title: Title,
-                    createChangedDocument: c => AddDefaultValueAttributeToFieldAsync(context.Document, fieldDecl, initializerValue, c),
-                    equivalenceKey: Title),
-                diagnostic);
         }
     }
 
