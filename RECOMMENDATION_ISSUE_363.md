@@ -4,10 +4,17 @@
 
 ### Issue Summary
 
-Issue #363 requests reducing the amount of re-invention required to use `PolyType.Roslyn`. The `Parser` class in the source generator overrides many methods from `TypeDataModelGenerator`, and these overrides contain non-trivial policy that is likely to change over time. The issue author proposes two potential solutions:
+Issue #363 requests reducing the amount of re-invention required to use `PolyType.Roslyn`. The `Parser` class in the source generator overrides many methods from `TypeDataModelGenerator`, and these overrides contain non-trivial policy that is likely to change over time. 
 
-1. Provide default behavior that matches PolyType while leaving the methods virtual
-2. Provide a derived type that the source generator uses such that consumers can derive from it
+### User Requirements
+
+The library should be factored so that a given user can choose any of:
+
+1. **Keep the logic AND the attributes** - use PolyType's full behavior out of the box
+2. **Keep the logic but replace the attributes** - use PolyType's constructor/property heuristics but with custom attributes
+3. **Replace both logic and attributes** - fully custom behavior
+
+Currently, the existing code only allows option 3. The goal is to refactor so that all three options are available.
 
 ### Analysis of Virtual Methods and Overrides
 
@@ -57,191 +64,165 @@ Below is the complete analysis of all virtual methods in `TypeDataModelGenerator
 
 ### Recommendation
 
-**Recommended Approach: Option 1 - Enhanced Base Class with Good Default Implementations**
+**Recommended Approach: Create an intermediate `PolyTypeModelGenerator` class in PolyType.Roslyn**
 
-The analysis shows that the functionality can be cleanly separated into:
+Based on the requirement to support all three use cases, the cleanest architecture is a three-level hierarchy:
 
-1. **General functionality** (can move to `TypeDataModelGenerator`):
-   - Constructor selection heuristics (without attribute parsing)
-   - Type normalization (erasing compiler metadata)
-   - Method/event resolution (public members, excluding Object methods)
-   - Duplicate name validation
+```text
+TypeDataModelGenerator (base class - core logic only, no attributes)
+    └── PolyTypeModelGenerator (new class - adds PolyType attribute parsing)
+        └── Parser (source generator - adds diagnostics and source generation specifics)
+```
 
-2. **Attribute-specific functionality** (remain in `Parser`):
-   - Parsing of PolyType-specific attributes
-   - Diagnostic reporting
-   - F# union/option handling (which depends on `PolyTypeKnownSymbols`)
+This architecture supports all three user requirements:
+
+| Use Case | Which Class to Extend |
+|----------|----------------------|
+| Keep logic + attributes | Extend `PolyTypeModelGenerator` |
+| Keep logic, replace attributes | Extend `TypeDataModelGenerator`, override attribute hooks |
+| Replace both | Extend `TypeDataModelGenerator`, override everything |
 
 #### Prescription
 
-**Step 1: Enhance `TypeDataModelGenerator` base class with improved default implementations**
+**Step 1: Enhance `TypeDataModelGenerator` with improved default implementations**
 
-Move the following implementations from `Parser` to `TypeDataModelGenerator`:
+Move the following **logic** (but not attribute parsing) from `Parser` to `TypeDataModelGenerator`:
 
 1. **`NormalizeType`**: Move the `EraseCompilerMetadata` call to the base class
-2. **`IsSupportedType`**: Add exclusion of ref-like types and static types
+2. **`IsSupportedType`**: Add exclusion of ref-like types and static types  
 3. **`FlattenSystemTupleTypes`**: Change default to `true` (better F# support)
 4. **`IncludeDelegateParameters`**: Change default to `true`
-5. **`ResolveConstructors`**: Move the selection heuristic to the base class (see `Parser.cs` lines 305-390 for the implementation):
-   ```csharp
-   protected virtual IEnumerable<IMethodSymbol> ResolveConstructors(ITypeSymbol type, ImmutableArray<PropertyDataModel> properties)
-   {
-       // 1. First check for attribute-marked constructors via virtual hook
-       //    The hook returns multiple if conflicting, or a single match, or empty
-       IMethodSymbol[] markedCtors = ResolveAttributeMarkedConstructors(type).ToArray();
-       if (markedCtors.Length == 1)
-       {
-           return markedCtors; // Unique match
-       }
-       else if (markedCtors.Length > 1)
-       {
-           // Multiple matches - fallback to heuristic (derived class can report diagnostic)
-       }
-       
-       // 2. Get all public accessible constructors (existing base logic)
-       IMethodSymbol[] constructors = base.ResolveConstructors(type, properties)
-           .Where(ctor => ctor.DeclaredAccessibility is Accessibility.Public)
-           .ToArray();
-       
-       // 3. Apply heuristic selection based on readable properties
-       // Build a dictionary of (Type, Name) -> isReadOnly for all readable properties
-       Dictionary<(ITypeSymbol, string), bool> readableProperties = new(s_ctorParamComparer);
-       foreach (var prop in properties)
-       {
-           if (prop.IncludeGetter)
-           {
-               var key = (prop.PropertyType, prop.Name);
-               bool isCurrentPropertyReadOnly = !prop.IncludeSetter;
-               if (readableProperties.TryGetValue(key, out bool isReadOnly))
-                   readableProperties[key] = isReadOnly && isCurrentPropertyReadOnly;
-               else
-                   readableProperties[key] = isCurrentPropertyReadOnly;
-           }
-       }
-       
-       // 4. Rank constructors using tuple: 
-       //    (-unmatchedRequiredParamCount, matchingReadOnlyMemberParamCount, -ctor.Parameters.Length)
-       //    Higher values are preferred, so we minimize unmatched params and total params,
-       //    while maximizing read-only property matches
-       return constructors
-           .OrderByDescending(ctor =>
-           {
-               int matchingReadOnlyMemberParamCount = 0;
-               int unmatchedRequiredParamCount = 0;
-               foreach (IParameterSymbol param in ctor.Parameters)
-               {
-                   if (readableProperties.TryGetValue((param.Type, param.Name), out bool isReadOnly))
-                   {
-                       if (isReadOnly) matchingReadOnlyMemberParamCount++;
-                   }
-                   else if (!param.IsOptional)
-                   {
-                       unmatchedRequiredParamCount++;
-                   }
-               }
-               return (-unmatchedRequiredParamCount, matchingReadOnlyMemberParamCount, -ctor.Parameters.Length);
-           })
-           .Take(1);
-   }
-   ```
+5. **`ResolveConstructors`**: Move the **heuristic selection** to the base class (minimizing unmatched params, maximizing read-only matches, minimizing total params)
 6. **`ResolveMethods`**: Implement default resolution of public ordinary methods (excluding Object methods, compiler-generated, etc.)
 7. **`ResolveEvents`**: Implement default resolution of public events
 
-**Step 2: Add new virtual hook methods for attribute parsing**
-
-Add the following virtual methods to `TypeDataModelGenerator` that return default values but can be overridden:
+Add **hook methods** that are called by the above methods but return empty/false by default:
 
 ```csharp
-// Called by ResolveConstructors to check for attribute-based constructor selection
-// Returns all constructors marked with attributes (empty if none, multiple if conflicting)
-protected virtual IEnumerable<IMethodSymbol> ResolveAttributeMarkedConstructors(ITypeSymbol type)
-    => [];
+// Called by ResolveConstructors to find attribute-marked constructors
+protected virtual IEnumerable<IMethodSymbol> ResolveAttributeMarkedConstructors(ITypeSymbol type) => [];
 
-// Called by IncludeProperty to check for custom name/order/ignore
-protected virtual bool TryGetPropertyMetadata(IPropertySymbol property, 
+// Called by IncludeProperty for custom name/order/ignore from attributes
+protected virtual bool TryGetPropertyAttributeMetadata(IPropertySymbol property, 
     out string? customName, out int order, out bool ignore)
 {
-    customName = null;
-    order = 0;
-    ignore = false;
-    return false;
+    customName = null; order = 0; ignore = false; return false;
 }
 
-// Called by IncludeField to check for custom name/order/ignore
-protected virtual bool TryGetFieldMetadata(IFieldSymbol field,
+// Called by IncludeField for custom name/order/ignore from attributes
+protected virtual bool TryGetFieldAttributeMetadata(IFieldSymbol field,
     out string? customName, out int order, out bool ignore)
 {
-    customName = null;
-    order = 0;
-    ignore = false;
-    return false;
+    customName = null; order = 0; ignore = false; return false;
 }
 
-// Called by ResolveMethods to check for method attributes
-protected virtual bool TryGetMethodMetadata(IMethodSymbol method,
+// Called by IsRequiredByPolicy for attribute-based required checking
+protected virtual bool? GetRequiredByAttribute(ISymbol member) => null;
+
+// Called by ResolveMethods for method attribute metadata
+protected virtual bool TryGetMethodAttributeMetadata(IMethodSymbol method,
     out string? customName, out bool ignore)
 {
-    customName = null;
-    ignore = false;
-    return false;
+    customName = null; ignore = false; return false;
 }
 
-// Called by ResolveEvents to check for event attributes  
-protected virtual bool TryGetEventMetadata(IEventSymbol eventSymbol,
+// Called by ResolveEvents for event attribute metadata
+protected virtual bool TryGetEventAttributeMetadata(IEventSymbol eventSymbol,
     out string? customName, out bool ignore)
 {
-    customName = null;
-    ignore = false;
-    return false;
+    customName = null; ignore = false; return false;
+}
+
+// Called by ResolveDerivedTypes
+protected virtual IEnumerable<(ITypeSymbol Type, string? Name, int Tag)> ResolveAttributeDerivedTypes(ITypeSymbol type) => [];
+```
+
+**Step 2: Create `PolyTypeModelGenerator` class in PolyType.Roslyn**
+
+This new class extends `TypeDataModelGenerator` and implements the PolyType attribute parsing:
+
+```csharp
+public class PolyTypeModelGenerator : TypeDataModelGenerator
+{
+    // Override all the attribute hook methods to parse PolyType attributes
+    protected override IEnumerable<IMethodSymbol> ResolveAttributeMarkedConstructors(ITypeSymbol type)
+    {
+        return type.GetMembers()
+            .OfType<IMethodSymbol>()
+            .Where(ctor => ctor is { IsStatic: false, MethodKind: MethodKind.Constructor })
+            .Where(ctor => ctor.HasAttribute(KnownSymbols.ConstructorShapeAttribute));
+    }
+    
+    protected override bool TryGetPropertyAttributeMetadata(IPropertySymbol property,
+        out string? customName, out int order, out bool ignore)
+    {
+        return ParsePropertyShapeAttribute(property, out customName, out order, out ignore);
+    }
+    
+    // ... similar for other attribute hooks
 }
 ```
 
-**Step 3: Update `Parser` class to use the new hooks**
+**Note:** This requires either:
+- Moving `PolyTypeKnownSymbols` attribute definitions to `PolyType.Roslyn` (preferred), OR
+- Having `PolyTypeModelGenerator` use string-based attribute lookup (e.g., `HasAttribute("PolyType.ConstructorShapeAttribute")`)
+
+**Step 3: Update `Parser` class to extend `PolyTypeModelGenerator`**
 
 The `Parser` class would then:
-1. Inherit the improved default implementations
-2. Override only the attribute parsing hooks
-3. Override `MapType` for F# support and surrogate handling (still needed)
-4. Override `ResolveDerivedTypes` for attribute parsing (still needed)
+1. Inherit from `PolyTypeModelGenerator` instead of `TypeDataModelGenerator`
+2. Only override methods for:
+   - Diagnostic reporting (e.g., `DuplicateConstructorShape`, `DuplicateMemberName`)
+   - F# union/option handling (still needed in source generator)
+   - Source generation-specific model mapping
 
 ### Benefits of This Approach
 
-1. **Third-party consumers can use `TypeDataModelGenerator` directly** with sensible defaults matching PolyType's behavior
-2. **The `Parser` class becomes smaller** and focused only on PolyType-specific attribute handling
-3. **No intermediate class needed** - the separation is clean at the method level
-4. **No breaking changes** - existing consumers of `TypeDataModelGenerator` continue to work
-5. **PolyType.Roslyn remains independent** of the source generator project
+1. **Use Case 1 (Keep logic + attributes)**: Users extend `PolyTypeModelGenerator` directly
+2. **Use Case 2 (Keep logic, custom attributes)**: Users extend `TypeDataModelGenerator` and override only the attribute hooks
+3. **Use Case 3 (Fully custom)**: Users extend `TypeDataModelGenerator` and override any method
+4. **No breaking changes**: Existing consumers continue to work
+5. **Clean separation**: Logic, attribute parsing, and source generation are cleanly separated
 
-### Alternative Consideration
+### Moving PolyType Attributes to PolyType.Roslyn
 
-If the above refactoring proves complex due to the tight integration of attribute parsing with the core logic, an alternative would be:
+For `PolyTypeModelGenerator` to work, we need access to the PolyType attribute type symbols. Options:
 
-**Option 2: Create an intermediate `PolyTypeModelGenerator` class**
+**Option A (Preferred): Move attribute symbol definitions to KnownSymbols**
 
-Create a new class in `PolyType.Roslyn`:
+Add the following to `KnownSymbols` in `PolyType.Roslyn`:
 
-```text
-TypeDataModelGenerator (base - minimal)
-    └── PolyTypeModelGenerator (new - with good defaults)
-        └── Parser (source generator - with attribute parsing and diagnostics)
+```csharp
+public INamedTypeSymbol? ConstructorShapeAttribute => GetOrResolveType("PolyType.ConstructorShapeAttribute", ref _ConstructorShapeAttribute);
+public INamedTypeSymbol? PropertyShapeAttribute => GetOrResolveType("PolyType.PropertyShapeAttribute", ref _PropertyShapeAttribute);
+public INamedTypeSymbol? MethodShapeAttribute => GetOrResolveType("PolyType.MethodShapeAttribute", ref _MethodShapeAttribute);
+public INamedTypeSymbol? EventShapeAttribute => GetOrResolveType("PolyType.EventShapeAttribute", ref _EventShapeAttribute);
+public INamedTypeSymbol? DerivedTypeShapeAttribute => GetOrResolveType("PolyType.DerivedTypeShapeAttribute", ref _DerivedTypeShapeAttribute);
+// ... etc
 ```
 
-This would:
-- Keep `TypeDataModelGenerator` minimal and stable
-- Provide `PolyTypeModelGenerator` with all the "good default" implementations
-- Allow `Parser` to focus solely on attribute parsing
+**Option B: Use string-based lookup in PolyTypeModelGenerator**
 
-However, this would require either:
-- Moving `PolyTypeKnownSymbols` to `PolyType.Roslyn` (coupling concerns)
-- Or keeping the F# support and surrogate handling in `Parser`
+```csharp
+protected virtual bool HasConstructorShapeAttribute(IMethodSymbol ctor)
+{
+    return ctor.GetAttributes().Any(a => 
+        a.AttributeClass?.ToDisplayString() == "PolyType.ConstructorShapeAttribute");
+}
+```
 
 ### Conclusion
 
-**The recommended approach is Option 1 (Enhanced Base Class)** because:
+**The recommended approach is to create a `PolyTypeModelGenerator` intermediate class** in `PolyType.Roslyn` that:
 
-1. The functionality is cleanly separable based on the analysis
-2. Most overrides in `Parser` either set different defaults or add attribute parsing on top of base functionality
-3. The constructor resolution heuristic is the most complex piece and is fully general-purpose
-4. No new intermediate classes are needed
+1. Extends `TypeDataModelGenerator` 
+2. Implements all PolyType attribute parsing via virtual hook methods
+3. Allows users who want PolyType behavior to extend it directly
+4. Allows users who want custom attributes to extend `TypeDataModelGenerator` and override only the hooks
 
-Implementation effort is moderate - primarily refactoring existing code from `Parser` to `TypeDataModelGenerator` and adding hook methods for attribute parsing.
+This cleanly separates:
+- **Core logic** (`TypeDataModelGenerator`) - constructor heuristics, property resolution, type normalization
+- **Attribute parsing** (`PolyTypeModelGenerator`) - PolyType-specific attribute handling
+- **Source generation** (`Parser`) - diagnostics, model export, F# specifics
+
+Implementation effort is moderate - primarily extracting attribute parsing into `PolyTypeModelGenerator` and adding hook methods to `TypeDataModelGenerator`.
