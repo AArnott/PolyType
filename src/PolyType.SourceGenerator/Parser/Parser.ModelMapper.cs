@@ -1028,7 +1028,7 @@ public sealed partial class Parser
         return false;
     }
 
-    private bool ParsePropertyShapeAttribute(ISymbol propertySymbol, out string propertyName, out int order, out bool ignore)
+    private new bool ParsePropertyShapeAttribute(ISymbol propertySymbol, out string propertyName, out int order, out bool ignore)
     {
         propertyName = propertySymbol.Name;
         order = 0;
