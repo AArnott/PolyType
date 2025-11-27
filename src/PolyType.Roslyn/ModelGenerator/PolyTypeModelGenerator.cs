@@ -608,7 +608,9 @@ public class PolyTypeModelGenerator : TypeDataModelGenerator
         out string? name,
         out int tag)
     {
-        derivedType = attributeData.ConstructorArguments.FirstOrDefault().Value as ITypeSymbol;
+        // TypedConstant is a struct, so FirstOrDefault() on an empty collection returns default
+        TypedConstant firstArg = attributeData.ConstructorArguments.FirstOrDefault();
+        derivedType = firstArg.Value as ITypeSymbol;
         name = null;
         tag = -1;
 

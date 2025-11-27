@@ -749,7 +749,10 @@ internal static class RoslynHelpers
     /// <summary>
     /// Tries to get a named argument from the attribute data.
     /// </summary>
-    /// <remarks>This internal version is intended for use within PolyType.Roslyn only.</remarks>
+    /// <remarks>
+    /// This internal version is intended for use within PolyType.Roslyn only.
+    /// The cast is intentionally unchecked to match the behavior in PolyType.SourceGenerator.
+    /// </remarks>
     internal static bool TryGetPolyTypeNamedArgument<T>(this AttributeData attributeData, string name, [MaybeNullWhen(false)] out T result)
     {
         foreach (KeyValuePair<string, TypedConstant> namedArgument in attributeData.NamedArguments)
