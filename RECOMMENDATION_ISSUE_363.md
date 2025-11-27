@@ -87,9 +87,15 @@ Move the following implementations from `Parser` to `TypeDataModelGenerator`:
    protected virtual IEnumerable<IMethodSymbol> ResolveConstructors(ITypeSymbol type, ImmutableArray<PropertyDataModel> properties)
    {
        // 1. First check for attribute-marked constructors via virtual hook
-       if (ResolveAttributeMarkedConstructor(type) is { } markedCtor)
+       //    The hook returns multiple if conflicting, or a single match, or empty
+       IMethodSymbol[] markedCtors = ResolveAttributeMarkedConstructors(type).ToArray();
+       if (markedCtors.Length == 1)
        {
-           return [markedCtor];
+           return markedCtors; // Unique match
+       }
+       else if (markedCtors.Length > 1)
+       {
+           // Multiple matches - fallback to heuristic (derived class can report diagnostic)
        }
        
        // 2. Get all public accessible constructors (existing base logic)
@@ -113,10 +119,28 @@ Move the following implementations from `Parser` to `TypeDataModelGenerator`:
            }
        }
        
-       // 4. Rank constructors by: minimize unmatched required params, 
-       //    maximize read-only property matches, minimize total params
+       // 4. Rank constructors using tuple: 
+       //    (-unmatchedRequiredParamCount, matchingReadOnlyMemberParamCount, -ctor.Parameters.Length)
+       //    Higher values are preferred, so we minimize unmatched params and total params,
+       //    while maximizing read-only property matches
        return constructors
-           .OrderByDescending(ctor => /* ranking logic */)
+           .OrderByDescending(ctor =>
+           {
+               int matchingReadOnlyMemberParamCount = 0;
+               int unmatchedRequiredParamCount = 0;
+               foreach (IParameterSymbol param in ctor.Parameters)
+               {
+                   if (readableProperties.TryGetValue((param.Type, param.Name), out bool isReadOnly))
+                   {
+                       if (isReadOnly) matchingReadOnlyMemberParamCount++;
+                   }
+                   else if (!param.IsOptional)
+                   {
+                       unmatchedRequiredParamCount++;
+                   }
+               }
+               return (-unmatchedRequiredParamCount, matchingReadOnlyMemberParamCount, -ctor.Parameters.Length);
+           })
            .Take(1);
    }
    ```
@@ -129,8 +153,9 @@ Add the following virtual methods to `TypeDataModelGenerator` that return defaul
 
 ```csharp
 // Called by ResolveConstructors to check for attribute-based constructor selection
-protected virtual IMethodSymbol? ResolveAttributeMarkedConstructor(ITypeSymbol type)
-    => null;
+// Returns all constructors marked with attributes (empty if none, multiple if conflicting)
+protected virtual IEnumerable<IMethodSymbol> ResolveAttributeMarkedConstructors(ITypeSymbol type)
+    => [];
 
 // Called by IncludeProperty to check for custom name/order/ignore
 protected virtual bool TryGetPropertyMetadata(IPropertySymbol property, 
