@@ -13,14 +13,9 @@ using System.Text.RegularExpressions;
 
 namespace PolyType.SourceGenerator;
 
-public sealed partial class Parser : TypeDataModelGenerator
+public sealed partial class Parser : PolyTypeModelGenerator
 {
     private const LanguageVersion MinimumSupportedLanguageVersion = LanguageVersion.CSharp9;
-
-    private static readonly IEqualityComparer<(ITypeSymbol Type, string Name)> s_ctorParamComparer =
-        CommonHelpers.CreateTupleComparer<ITypeSymbol, string>(
-            SymbolEqualityComparer.Default,
-            CommonHelpers.CamelCaseInvariantComparer.Instance);
 
     private readonly PolyTypeKnownSymbols _knownSymbols;
     private readonly IReadOnlyDictionary<ITypeSymbol, TypeExtensionModel> _typeShapeExtensions;
@@ -193,28 +188,16 @@ public sealed partial class Parser : TypeDataModelGenerator
         }
     }
 
-    // Provide no location for diagnostics by default.
-    public override Location? DefaultLocation => null;
-
-    // We want to flatten System.Tuple types for consistency with
-    // the reflection-based provider (which caters to F# model types).
-    protected override bool FlattenSystemTupleTypes => true;
-
-    // Full types used as generic parameters so we must exclude ref structs.
-    protected override bool IsSupportedType(ITypeSymbol type) =>
-        base.IsSupportedType(type) && !type.IsRefLikeType && !type.IsStatic;
-
     // Erase nullable annotations and tuple labels from generated types.
     protected override ITypeSymbol NormalizeType(ITypeSymbol type) =>
         KnownSymbols.Compilation.EraseCompilerMetadata(type);
 
-    // Include delegate parameter types into generated shapes.
-    protected override bool IncludeDelegateParameters => true;
-
+    // Override to use Parser's extended ParsePropertyShapeAttribute which includes DataContract/IgnoreDataMember support
     protected override bool IncludeProperty(IPropertySymbol property, out string? customName, out int order, out bool includeGetter, out bool includeSetter)
     {
-        if (ParsePropertyShapeAttribute(property, out customName, out order, out bool ignore))
+        if (ParsePropertyShapeAttribute(property, out string propertyName, out order, out bool ignore))
         {
+            customName = propertyName != property.Name ? propertyName : null;
             if (ignore)
             {
                 includeGetter = includeSetter = false;
@@ -231,10 +214,12 @@ public sealed partial class Parser : TypeDataModelGenerator
         return base.IncludeProperty(property, out customName, out order, out includeGetter, out includeSetter);
     }
 
+    // Override to use Parser's extended ParsePropertyShapeAttribute which includes DataContract/IgnoreDataMember support
     protected override bool IncludeField(IFieldSymbol field, out string? customName, out int order, out bool includeGetter, out bool includeSetter)
     {
-        if (ParsePropertyShapeAttribute(field, out customName, out order, out bool ignore))
+        if (ParsePropertyShapeAttribute(field, out string fieldName, out order, out bool ignore))
         {
+            customName = fieldName != field.Name ? fieldName : null;
             if (ignore)
             {
                 includeGetter = includeSetter = false;
@@ -266,293 +251,55 @@ public sealed partial class Parser : TypeDataModelGenerator
         }
     }
 
-    protected override bool? IsRequiredByPolicy(IPropertySymbol member)
+    // Override the hook to report a diagnostic
+    protected override void OnMultipleConstructorShapeAttributesFound(ITypeSymbol type, IMethodSymbol[] constructors)
     {
-        if (member.ContainingType.HasAttribute(_knownSymbols.DataContractAttribute) &&
-            member.GetAttribute(_knownSymbols.DataMemberAttribute) is AttributeData dataMemberAttribute &&
-            dataMemberAttribute.TryGetNamedArgument("IsRequired", out bool isRequiredDataMember))
-        {
-            return isRequiredDataMember;
-        }
-
-        if (member.GetAttribute(_knownSymbols.PropertyShapeAttribute) is AttributeData shapeAttribute &&
-            shapeAttribute.TryGetNamedArgument("IsRequired", out bool isRequiredValue))
-        {
-            return isRequiredValue;
-        }
-
-        return base.IsRequiredByPolicy(member);
+        ReportDiagnostic(DuplicateConstructorShape, constructors[^1].Locations.FirstOrDefault(), type.ToDisplayString());
     }
 
-    protected override bool? IsRequiredByPolicy(IFieldSymbol member)
-    {
-        if (member.ContainingType.HasAttribute(_knownSymbols.DataContractAttribute) &&
-            member.GetAttribute(_knownSymbols.DataMemberAttribute) is AttributeData dataMemberAttribute &&
-            dataMemberAttribute.TryGetNamedArgument("IsRequired", out bool isRequiredDataMember))
-        {
-            return isRequiredDataMember;
-        }
-
-        if (member.GetAttribute(_knownSymbols.PropertyShapeAttribute) is AttributeData shapeAttribute && shapeAttribute.TryGetNamedArgument("IsRequired", out bool isRequiredValue))
-        {
-            return isRequiredValue;
-        }
-
-        return base.IsRequiredByPolicy(member);
-    }
-
-    // Resolve constructors with the [ConstructorShape] attribute.
-    protected override IEnumerable<IMethodSymbol> ResolveConstructors(ITypeSymbol type, ImmutableArray<PropertyDataModel> properties)
-    {
-        if (type.IsAbstract || type.TypeKind is TypeKind.Interface)
-        {
-            return [];
-        }
-
-        // Search for constructors that have the [ConstructorShape] attribute. Ignore accessibility modifiers in this step.
-        IMethodSymbol[] constructors = type.GetMembers()
-            .OfType<IMethodSymbol>()
-            .Where(ctor => ctor is { IsStatic: false, MethodKind: MethodKind.Constructor })
-            .Where(ctor => ctor.HasAttribute(_knownSymbols.ConstructorShapeAttribute))
-            .ToArray();
-
-        if (constructors.Length == 1)
-        {
-            return constructors; // Found a unique match, return that.
-        }
-
-        if (constructors.Length > 1)
-        {
-            // We have a conflict, report a diagnostic and pick one using the default heuristic.
-            ReportDiagnostic(DuplicateConstructorShape, constructors[^1].Locations.FirstOrDefault(), type.ToDisplayString());
-        }
-        else
-        {
-            // Otherwise, just resolve the public constructors on the type.
-            constructors = base.ResolveConstructors(type, properties)
-                .Where(ctor => ctor.DeclaredAccessibility is Accessibility.Public)
-                .ToArray();
-        }
-
-        // If the type defines more than one constructors, pick one using the following rules:
-        // 1. Minimize the number of required parameters not corresponding to any readable property/field.
-        // 2. Maximize the number of parameters that match read-only properties/fields.
-        // 3. Minimize the total number of constructor parameters.
-
-        Dictionary<(ITypeSymbol, string), bool> readableProperties = new(s_ctorParamComparer);
-        foreach (var prop in properties)
-        {
-            if (prop.IncludeGetter)
-            {
-                var key = (prop.PropertyType, prop.Name);
-                // For each property, check if it's read-only.
-                // If we've already seen this property (by type and name), keep it marked as read-only
-                // only if ALL occurrences are read-only (e.g., handling shadowing/overrides).
-                bool isCurrentPropertyReadOnly = !prop.IncludeSetter;
-                
-                if (readableProperties.TryGetValue(key, out bool isReadOnly))
-                {
-                    // If already exists, AND with current property's read-only status
-                    readableProperties[key] = isReadOnly && isCurrentPropertyReadOnly;
-                }
-                else
-                {
-                    // First occurrence, just set to current property's read-only status
-                    readableProperties[key] = isCurrentPropertyReadOnly;
-                }
-            }
-        }
-
-        return constructors
-            .OrderByDescending(ctor =>
-            {
-                int matchingReadOnlyMemberParamCount = 0;
-                int unmatchedRequiredParamCount = 0;
-                foreach (IParameterSymbol param in ctor.Parameters)
-                {
-                    if (readableProperties.TryGetValue((param.Type, param.Name), out bool isReadOnly))
-                    {
-                        // Do not count settable members as they can be set after any constructor.
-                        if (isReadOnly)
-                        {
-                            matchingReadOnlyMemberParamCount++;
-                        }
-                    }
-                    else if (!param.IsOptional)
-                    {
-                        unmatchedRequiredParamCount++;
-                    }
-                }
-
-                return (-unmatchedRequiredParamCount, matchingReadOnlyMemberParamCount, -ctor.Parameters.Length);
-            })
-            .Take(1);
-    }
-
+    // Override ResolveMethods to add duplicate name validation with diagnostics
     protected override IEnumerable<ResolvedMethodSymbol> ResolveMethods(ITypeSymbol type, BindingFlags bindingFlags)
     {
-        if (type is not INamedTypeSymbol namedType)
+        if (type is not INamedTypeSymbol)
         {
             yield break;
         }
 
         HashSet<string>? methodNames = null;
-        foreach ((IMethodSymbol method, bool isAmbiguous) in type.ResolveVisibleMembers<IMethodSymbol>())
+        foreach (var resolvedMethod in base.ResolveMethods(type, bindingFlags))
         {
-            if (IncludeMethod(method, out string? customName))
+            // To account for overloads, method identifiers include the method name and parameter types but not the return type.
+            string name = resolvedMethod.CustomName ?? resolvedMethod.MethodSymbol.Name;
+            string identifier = $"{resolvedMethod.CustomName ?? resolvedMethod.MethodSymbol.Name}({string.Join(", ", resolvedMethod.MethodSymbol.Parameters.Select(p => p.Type.GetFullyQualifiedName()))})";
+            if (!(methodNames ??= new()).Add(identifier))
             {
-                // To account for overloads, method identifiers include the method name and parameter types but not the return type.
-                string name = customName ?? method.Name;
-                string identifier = $"{customName ?? method.Name}({string.Join(", ", method.Parameters.Select(p => p.Type.GetFullyQualifiedName()))})";
-                if (!(methodNames ??= new()).Add(identifier))
-                {
-                    ReportDiagnostic(DuplicateMemberName, method.Locations.FirstOrDefault(), name, type.ToDisplayString(), "MethodShape");
-                    continue;
-                }
-
-                yield return new() { CustomName = customName, MethodSymbol = method, IsAmbiguous = isAmbiguous };
-            }
-        }
-
-        bool IncludeMethod(IMethodSymbol method, out string? customName)
-        {
-            customName = null;
-
-            if (method.MethodKind is not MethodKind.Ordinary ||
-                !SyntaxFacts.IsValidIdentifier(method.Name) ||
-                method.IsImplicitlyDeclared ||
-                method.HasAttribute(KnownSymbols.CompilerGeneratedAttribute))
-            {
-                return false; // Skip methods that are special names (getters, setters, events) or compiler-generated.
+                ReportDiagnostic(DuplicateMemberName, resolvedMethod.MethodSymbol.Locations.FirstOrDefault(), name, type.ToDisplayString(), "MethodShape");
+                continue;
             }
 
-            if (ParseMethodShapeAttribute(method, out customName, out bool? ignore))
-            {
-                return ignore is null or false; // Skip methods explicitly marked as ignored.
-            }
-
-            if (method.DeclaredAccessibility is not Accessibility.Public || method.MethodKind is not MethodKind.Ordinary)
-            {
-                return false; // Skip methods that are not public when not annotated.
-            }
-
-            if (SymbolEqualityComparer.Default.Equals(method.ContainingType, KnownSymbols.Compilation.ObjectType) ||
-                SymbolEqualityComparer.Default.Equals(method.ContainingType, KnownSymbols.SystemValueType))
-            {
-                return false; // Skip GetHashCode, ToString, Equals, and other object methods.
-            }
-
-            BindingFlags requiredFlags = method.IsStatic ? BindingFlags.Public | BindingFlags.Static : BindingFlags.Public | BindingFlags.Instance;
-            if ((bindingFlags & requiredFlags) == 0)
-            {
-                return false; // Skip methods that are not included in the shape by default.
-            }
-
-            return true;
-        }
-
-        bool ParseMethodShapeAttribute(IMethodSymbol method, out string? name, out bool? ignore)
-        {
-            name = null;
-            ignore = null;
-            if (method.GetAttribute(_knownSymbols.MethodShapeAttribute) is not AttributeData methodShapeAttr)
-            {
-                return false;
-            }
-
-            foreach (KeyValuePair<string, TypedConstant> namedArgument in methodShapeAttr.NamedArguments)
-            {
-                switch (namedArgument.Key)
-                {
-                    case "Name":
-                        name = (string)namedArgument.Value.Value!;
-                        break;
-                    case "Ignore":
-                        ignore = (bool)namedArgument.Value.Value!;
-                        break;
-                }
-            }
-
-            return true;
+            yield return resolvedMethod;
         }
     }
 
+    // Override ResolveEvents to add duplicate name validation with diagnostics
     protected override IEnumerable<ResolvedEventSymbol> ResolveEvents(ITypeSymbol type, BindingFlags bindingFlags)
     {
-        if (type is not INamedTypeSymbol namedType)
+        if (type is not INamedTypeSymbol)
         {
             yield break;
         }
 
         HashSet<string>? eventNames = null;
-        foreach ((IEventSymbol eventSymbol, bool isAmbiguous) in namedType.ResolveVisibleMembers<IEventSymbol>())
+        foreach (var resolvedEvent in base.ResolveEvents(type, bindingFlags))
         {
-            if (IncludeEvent(eventSymbol, out string? customName))
+            string name = resolvedEvent.CustomName ?? resolvedEvent.Event.Name;
+            if (!(eventNames ??= new()).Add(name))
             {
-                string name = customName ?? eventSymbol.Name;
-                if (!(eventNames ??= new()).Add(name))
-                {
-                    ReportDiagnostic(DuplicateMemberName, eventSymbol.Locations.FirstOrDefault(), name, type.ToDisplayString(), "EventShape");
-                    continue;
-                }
-
-                yield return new() { CustomName = customName, Event = eventSymbol, IsAmbiguous = isAmbiguous };
-            }
-        }
-
-        bool IncludeEvent(IEventSymbol eventSymbol, out string? customName)
-        {
-            customName = null;
-
-            if (!SyntaxFacts.IsValidIdentifier(eventSymbol.Name) ||
-                eventSymbol.IsImplicitlyDeclared ||
-                eventSymbol.HasAttribute(KnownSymbols.CompilerGeneratedAttribute))
-            {
-                return false; // Skip events that are explicit interface implementations or compiler-generated.
+                ReportDiagnostic(DuplicateMemberName, resolvedEvent.Event.Locations.FirstOrDefault(), name, type.ToDisplayString(), "EventShape");
+                continue;
             }
 
-            if (ParseEventShapeAttribute(eventSymbol, out customName, out bool? ignore))
-            {
-                return ignore is not true; // Skip events explicitly marked as ignored.
-            }
-
-            if (eventSymbol.DeclaredAccessibility is not Accessibility.Public)
-            {
-                return false; // Skip events that are not public when not annotated.
-            }
-
-            BindingFlags requiredFlags = eventSymbol.IsStatic ? BindingFlags.Public | BindingFlags.Static : BindingFlags.Public | BindingFlags.Instance;
-            if ((bindingFlags & requiredFlags) == 0)
-            {
-                return false; // Skip events that are not included in the shape by default.
-            }
-
-            return true;
-        }
-
-        bool ParseEventShapeAttribute(IEventSymbol eventSymbol, out string? name, out bool? ignore)
-        {
-            name = null;
-            ignore = null;
-            if (eventSymbol.GetAttribute(_knownSymbols.EventShapeAttribute) is not AttributeData methodShapeAttr)
-            {
-                return false;
-            }
-
-            foreach (KeyValuePair<string, TypedConstant> namedArgument in methodShapeAttr.NamedArguments)
-            {
-                switch (namedArgument.Key)
-                {
-                    case "Name":
-                        name = (string)namedArgument.Value.Value!;
-                        break;
-                    case "Ignore":
-                        ignore = (bool)namedArgument.Value.Value!;
-                        break;
-                }
-            }
-
-            return true;
+            yield return resolvedEvent;
         }
     }
 
@@ -581,95 +328,20 @@ public sealed partial class Parser : TypeDataModelGenerator
         return status;
     }
 
-    protected override IEnumerable<DerivedTypeModel> ResolveDerivedTypes(ITypeSymbol type)
+    // Override the derived type diagnostic hooks
+    protected override void OnDerivedTypeUnsupportedGenerics(ITypeSymbol baseType, ITypeSymbol derivedType, AttributeData attribute)
     {
-        if (type.TypeKind is not (TypeKind.Class or TypeKind.Interface))
-        {
-            yield break;
-        }
+        ReportDiagnostic(DerivedTypeUnsupportedGenerics, attribute.GetLocation(), derivedType.ToDisplayString(), baseType.ToDisplayString());
+    }
 
-        int i = 0;
-        ITypeSymbol[]? baseTypeArgs = null;
-        HashSet<ITypeSymbol> types = new(SymbolEqualityComparer.Default);
-        HashSet<int> tags = new();
-        HashSet<string> names = new(StringComparer.Ordinal);
-        foreach (AttributeData attribute in type.GetAttributes())
-        {
-            ITypeSymbol? derivedType = null;
-            string? name = null;
-            int tag = -1;
+    protected override void OnDerivedTypeNotAssignableToBase(ITypeSymbol baseType, ITypeSymbol derivedType, AttributeData attribute)
+    {
+        ReportDiagnostic(DerivedTypeNotAssignableToBase, attribute.GetLocation(), derivedType.ToDisplayString(), baseType.ToDisplayString());
+    }
 
-            if (SymbolEqualityComparer.Default.Equals(attribute.AttributeClass, _knownSymbols.DerivedTypeShapeAttribute))
-            {
-                ParseDerivedTypeShapeAttribute(attribute, out derivedType, out name, out tag);
-            }
-            else if (SymbolEqualityComparer.Default.Equals(attribute.AttributeClass, _knownSymbols.KnownTypeAttribute) &&
-                     type.HasAttribute(_knownSymbols.DataContractAttribute))
-            {
-                if (attribute.ConstructorArguments is not [{ Value: ITypeSymbol dt }])
-                {
-                    continue;
-                }
-
-                derivedType = dt;
-            }
-            else
-            {
-                continue;
-            }
-
-            if (derivedType is INamedTypeSymbol { IsUnboundGenericType: true } namedDerivedType)
-            {
-                baseTypeArgs ??= ((INamedTypeSymbol)type).GetRecursiveTypeArguments();
-                INamedTypeSymbol? specializedDerivedType = namedDerivedType.OriginalDefinition.ConstructRecursive(baseTypeArgs);
-                if (specializedDerivedType is null || !type.IsAssignableFrom(specializedDerivedType))
-                {
-                    ReportDiagnostic(DerivedTypeUnsupportedGenerics, attribute.GetLocation(), derivedType.ToDisplayString(), type.ToDisplayString());
-                    continue;
-                }
-
-                derivedType = specializedDerivedType;
-            }
-            else if (!type.IsAssignableFrom(derivedType))
-            {
-                ReportDiagnostic(DerivedTypeNotAssignableToBase, attribute.GetLocation(), derivedType.ToDisplayString(), type.ToDisplayString());
-                continue;
-            }
-
-            bool isTagSpecified = tag >= 0;
-            tag = isTagSpecified ? tag : i;
-            name ??= derivedType.GetDerivedTypeShapeName();
-
-            if (!types.Add(derivedType))
-            {
-                ReportDiagnostic(DerivedTypeDuplicateMetadata, attribute.GetLocation(), type.ToDisplayString(), "type", derivedType.ToDisplayString());
-                continue;
-            }
-
-            if (!tags.Add(tag))
-            {
-                ReportDiagnostic(DerivedTypeDuplicateMetadata, attribute.GetLocation(), type.ToDisplayString(), "tag", tag);
-                continue;
-            }
-
-            if (!names.Add(name))
-            {
-                ReportDiagnostic(DerivedTypeDuplicateMetadata, attribute.GetLocation(), type.ToDisplayString(), "name", name);
-                continue;
-            }
-
-            yield return new DerivedTypeModel
-            {
-                Type = derivedType,
-                Name = name,
-                Tag = tag,
-                IsTagSpecified = isTagSpecified,
-                Index = i,
-                IsBaseType = SymbolEqualityComparer.Default.Equals(derivedType, type),
-            };
-
-            i++;
-        }
+    protected override void OnDerivedTypeDuplicateMetadata(ITypeSymbol baseType, string metadataType, string duplicateValue, AttributeData attribute)
+    {
+        ReportDiagnostic(DerivedTypeDuplicateMetadata, attribute.GetLocation(), baseType.ToDisplayString(), metadataType, duplicateValue);
     }
 
     protected override TypeDataModelGenerationStatus MapType(ITypeSymbol type, TypeDataKind? requestedKind, BindingFlags? methodBindingFlags, ImmutableArray<AssociatedTypeModel> associatedTypes, ref TypeDataModelGenerationContext ctx, TypeShapeRequirements requirements, out TypeDataModel? model)
@@ -1213,30 +885,6 @@ public sealed partial class Parser : TypeDataModelGenerator
         }
 
         return results;
-    }
-
-    private static void ParseDerivedTypeShapeAttribute(
-        AttributeData attributeData,
-        out ITypeSymbol derivedType,
-        out string? name,
-        out int tag)
-    {
-        derivedType = (ITypeSymbol)attributeData.ConstructorArguments.First().Value!;
-        name = null;
-        tag = -1;
-
-        foreach (KeyValuePair<string, TypedConstant> namedArgument in attributeData.NamedArguments)
-        {
-            switch (namedArgument.Key)
-            {
-                case "Name":
-                    name = (string)namedArgument.Value.Value!;
-                    break;
-                case "Tag":
-                    tag = (int)namedArgument.Value.Value!;
-                    break;
-            }
-        }
     }
 
     private AssociatedTypeId CreateAssociatedTypeId(INamedTypeSymbol open, INamedTypeSymbol closed)

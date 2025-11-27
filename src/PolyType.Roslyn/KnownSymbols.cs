@@ -290,6 +290,66 @@ public class KnownSymbols(Compilation compilation)
     private Option<INamedTypeSymbol?> _FSharpMap;
 
     /// <summary>
+    /// The type symbol for the PolyType.ConstructorShapeAttribute.
+    /// </summary>
+    public INamedTypeSymbol? ConstructorShapeAttribute => GetOrResolveType("PolyType.ConstructorShapeAttribute", ref _ConstructorShapeAttribute);
+    private Option<INamedTypeSymbol?> _ConstructorShapeAttribute;
+
+    /// <summary>
+    /// The type symbol for the PolyType.PropertyShapeAttribute.
+    /// </summary>
+    public INamedTypeSymbol? PropertyShapeAttribute => GetOrResolveType("PolyType.PropertyShapeAttribute", ref _PropertyShapeAttribute);
+    private Option<INamedTypeSymbol?> _PropertyShapeAttribute;
+
+    /// <summary>
+    /// The type symbol for the PolyType.MethodShapeAttribute.
+    /// </summary>
+    public INamedTypeSymbol? MethodShapeAttribute => GetOrResolveType("PolyType.MethodShapeAttribute", ref _MethodShapeAttribute);
+    private Option<INamedTypeSymbol?> _MethodShapeAttribute;
+
+    /// <summary>
+    /// The type symbol for the PolyType.EventShapeAttribute.
+    /// </summary>
+    public INamedTypeSymbol? EventShapeAttribute => GetOrResolveType("PolyType.EventShapeAttribute", ref _EventShapeAttribute);
+    private Option<INamedTypeSymbol?> _EventShapeAttribute;
+
+    /// <summary>
+    /// The type symbol for the PolyType.DerivedTypeShapeAttribute.
+    /// </summary>
+    public INamedTypeSymbol? DerivedTypeShapeAttribute => GetOrResolveType("PolyType.DerivedTypeShapeAttribute", ref _DerivedTypeShapeAttribute);
+    private Option<INamedTypeSymbol?> _DerivedTypeShapeAttribute;
+
+    /// <summary>
+    /// The type symbol for the System.Runtime.Serialization.DataContractAttribute.
+    /// </summary>
+    public INamedTypeSymbol? DataContractAttribute => GetOrResolveType("System.Runtime.Serialization.DataContractAttribute", ref _DataContractAttribute);
+    private Option<INamedTypeSymbol?> _DataContractAttribute;
+
+    /// <summary>
+    /// The type symbol for the System.Runtime.Serialization.DataMemberAttribute.
+    /// </summary>
+    public INamedTypeSymbol? DataMemberAttribute => GetOrResolveType("System.Runtime.Serialization.DataMemberAttribute", ref _DataMemberAttribute);
+    private Option<INamedTypeSymbol?> _DataMemberAttribute;
+
+    /// <summary>
+    /// The type symbol for the System.Runtime.Serialization.EnumMemberAttribute.
+    /// </summary>
+    public INamedTypeSymbol? EnumMemberAttribute => GetOrResolveType("System.Runtime.Serialization.EnumMemberAttribute", ref _EnumMemberAttribute);
+    private Option<INamedTypeSymbol?> _EnumMemberAttribute;
+
+    /// <summary>
+    /// The type symbol for the System.Runtime.Serialization.KnownTypeAttribute.
+    /// </summary>
+    public INamedTypeSymbol? KnownTypeAttribute => GetOrResolveType("System.Runtime.Serialization.KnownTypeAttribute", ref _KnownTypeAttribute);
+    private Option<INamedTypeSymbol?> _KnownTypeAttribute;
+
+    /// <summary>
+    /// The type symbol for the PolyType.EnumMemberShapeAttribute.
+    /// </summary>
+    public INamedTypeSymbol? EnumMemberShapeAttribute => GetOrResolveType("PolyType.EnumMemberShapeAttribute", ref _EnumMemberShapeAttribute);
+    private Option<INamedTypeSymbol?> _EnumMemberShapeAttribute;
+
+    /// <summary>
     /// Gets the resolved target framework of the current compilation
     /// </summary>
     public TargetFramework TargetFramework => _targetFramework ??= ResolveTargetFramework();

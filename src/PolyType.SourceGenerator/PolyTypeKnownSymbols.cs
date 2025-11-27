@@ -52,25 +52,26 @@ public sealed class PolyTypeKnownSymbols(Compilation compilation) : KnownSymbols
     public INamedTypeSymbol? AssociatedTypeAttributeAttribute => GetOrResolveType("PolyType.Abstractions.AssociatedTypeAttributeAttribute", ref _AssociatedTypeAttributeAttribute);
     private Option<INamedTypeSymbol?> _AssociatedTypeAttributeAttribute;
 
-    public INamedTypeSymbol? PropertyShapeAttribute => GetOrResolveType("PolyType.PropertyShapeAttribute", ref _PropertyShapeAttribute);
+    // Shadowing base class properties to ensure correct caching
+    public new INamedTypeSymbol? PropertyShapeAttribute => GetOrResolveType("PolyType.PropertyShapeAttribute", ref _PropertyShapeAttribute);
     private Option<INamedTypeSymbol?> _PropertyShapeAttribute;
 
-    public INamedTypeSymbol? EnumMemberShapeAttribute => GetOrResolveType("PolyType.EnumMemberShapeAttribute", ref _EnumMemberShapeAttribute);
+    public new INamedTypeSymbol? EnumMemberShapeAttribute => GetOrResolveType("PolyType.EnumMemberShapeAttribute", ref _EnumMemberShapeAttribute);
     private Option<INamedTypeSymbol?> _EnumMemberShapeAttribute;
 
-    public INamedTypeSymbol? ConstructorShapeAttribute => GetOrResolveType("PolyType.ConstructorShapeAttribute", ref _ConstructorShapeAttribute);
+    public new INamedTypeSymbol? ConstructorShapeAttribute => GetOrResolveType("PolyType.ConstructorShapeAttribute", ref _ConstructorShapeAttribute);
     private Option<INamedTypeSymbol?> _ConstructorShapeAttribute;
 
-    public INamedTypeSymbol? MethodShapeAttribute => GetOrResolveType("PolyType.MethodShapeAttribute", ref _MethodShapeAttribute);
+    public new INamedTypeSymbol? MethodShapeAttribute => GetOrResolveType("PolyType.MethodShapeAttribute", ref _MethodShapeAttribute);
     private Option<INamedTypeSymbol?> _MethodShapeAttribute;
 
-    public INamedTypeSymbol? EventShapeAttribute => GetOrResolveType("PolyType.EventShapeAttribute", ref _EventShapeAttribute);
+    public new INamedTypeSymbol? EventShapeAttribute => GetOrResolveType("PolyType.EventShapeAttribute", ref _EventShapeAttribute);
     private Option<INamedTypeSymbol?> _EventShapeAttribute;
 
     public INamedTypeSymbol? ParameterShapeAttribute => GetOrResolveType("PolyType.ParameterShapeAttribute", ref _ParameterShapeAttribute);
     private Option<INamedTypeSymbol?> _ParameterShapeAttribute;
 
-    public INamedTypeSymbol? DerivedTypeShapeAttribute => GetOrResolveType("PolyType.DerivedTypeShapeAttribute", ref _DerivedTypeShapeAttribute);
+    public new INamedTypeSymbol? DerivedTypeShapeAttribute => GetOrResolveType("PolyType.DerivedTypeShapeAttribute", ref _DerivedTypeShapeAttribute);
     private Option<INamedTypeSymbol?> _DerivedTypeShapeAttribute;
 
     public INamedTypeSymbol? MarshalerType => GetOrResolveType("PolyType.IMarshaler`2", ref _Marshaler);
@@ -91,19 +92,19 @@ public sealed class PolyTypeKnownSymbols(Compilation compilation) : KnownSymbols
     public INamedTypeSymbol? FSharpUnitType => GetOrResolveType("Microsoft.FSharp.Core.Unit", ref _FSharpUnitType);
     private Option<INamedTypeSymbol?> _FSharpUnitType;
 
-    public INamedTypeSymbol? DataContractAttribute => GetOrResolveType("System.Runtime.Serialization.DataContractAttribute", ref _DataContractAttribute);
+    public new INamedTypeSymbol? DataContractAttribute => GetOrResolveType("System.Runtime.Serialization.DataContractAttribute", ref _DataContractAttribute);
     private Option<INamedTypeSymbol?> _DataContractAttribute;
 
-    public INamedTypeSymbol? DataMemberAttribute => GetOrResolveType("System.Runtime.Serialization.DataMemberAttribute", ref _DataMemberAttribute);
+    public new INamedTypeSymbol? DataMemberAttribute => GetOrResolveType("System.Runtime.Serialization.DataMemberAttribute", ref _DataMemberAttribute);
     private Option<INamedTypeSymbol?> _DataMemberAttribute;
 
-    public INamedTypeSymbol? EnumMemberAttribute => GetOrResolveType("System.Runtime.Serialization.EnumMemberAttribute", ref _EnumMemberAttribute);
+    public new INamedTypeSymbol? EnumMemberAttribute => GetOrResolveType("System.Runtime.Serialization.EnumMemberAttribute", ref _EnumMemberAttribute);
     private Option<INamedTypeSymbol?> _EnumMemberAttribute;
 
     public INamedTypeSymbol? IgnoreDataMemberAttribute => GetOrResolveType("System.Runtime.Serialization.IgnoreDataMemberAttribute", ref _IgnoreDataMemberAttribute);
     private Option<INamedTypeSymbol?> _IgnoreDataMemberAttribute;
 
-    public INamedTypeSymbol? KnownTypeAttribute => GetOrResolveType("System.Runtime.Serialization.KnownTypeAttribute", ref _KnownTypeAttribute);
+    public new INamedTypeSymbol? KnownTypeAttribute => GetOrResolveType("System.Runtime.Serialization.KnownTypeAttribute", ref _KnownTypeAttribute);
     private Option<INamedTypeSymbol?> _KnownTypeAttribute;
 
     public INamedTypeSymbol? ConditionalAttribute => GetOrResolveType("System.Diagnostics.ConditionalAttribute", ref _ConditionalAttribute);
