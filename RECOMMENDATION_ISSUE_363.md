@@ -147,10 +147,12 @@ public class PolyTypeModelGenerator : TypeDataModelGenerator
     // Override all the attribute hook methods to parse PolyType attributes
     protected override IEnumerable<IMethodSymbol> ResolveAttributeMarkedConstructors(ITypeSymbol type)
     {
+        // Use ConstructorShapeAttribute from KnownSymbols (after adding it there)
+        // or use string-based lookup as shown in Option B below
         return type.GetMembers()
             .OfType<IMethodSymbol>()
             .Where(ctor => ctor is { IsStatic: false, MethodKind: MethodKind.Constructor })
-            .Where(ctor => ctor.HasAttribute(KnownSymbols.ConstructorShapeAttribute));
+            .Where(ctor => HasConstructorShapeAttribute(ctor));
     }
     
     protected override bool TryGetPropertyAttributeMetadata(IPropertySymbol property,
@@ -190,14 +192,18 @@ For `PolyTypeModelGenerator` to work, we need access to the PolyType attribute t
 
 **Option A (Preferred): Move attribute symbol definitions to KnownSymbols**
 
-Add the following to `KnownSymbols` in `PolyType.Roslyn`:
+Add the following to `KnownSymbols` in `PolyType.Roslyn` (with backing fields):
 
 ```csharp
 public INamedTypeSymbol? ConstructorShapeAttribute => GetOrResolveType("PolyType.ConstructorShapeAttribute", ref _ConstructorShapeAttribute);
+private Option<INamedTypeSymbol?> _ConstructorShapeAttribute;
+
 public INamedTypeSymbol? PropertyShapeAttribute => GetOrResolveType("PolyType.PropertyShapeAttribute", ref _PropertyShapeAttribute);
+private Option<INamedTypeSymbol?> _PropertyShapeAttribute;
+
 public INamedTypeSymbol? MethodShapeAttribute => GetOrResolveType("PolyType.MethodShapeAttribute", ref _MethodShapeAttribute);
-public INamedTypeSymbol? EventShapeAttribute => GetOrResolveType("PolyType.EventShapeAttribute", ref _EventShapeAttribute);
-public INamedTypeSymbol? DerivedTypeShapeAttribute => GetOrResolveType("PolyType.DerivedTypeShapeAttribute", ref _DerivedTypeShapeAttribute);
+private Option<INamedTypeSymbol?> _MethodShapeAttribute;
+
 // ... etc
 ```
 
