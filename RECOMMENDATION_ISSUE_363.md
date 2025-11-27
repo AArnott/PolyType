@@ -15,8 +15,8 @@ Below is the complete analysis of all virtual methods in `TypeDataModelGenerator
 
 #### Methods in TypeDataModelGenerator Base Class
 
-| Method | Base Implementation | Parser Override | Source-Generator Specific? |
-|--------|---------------------|-----------------|---------------------------|
+| Method | Base Implementation | Parser Override | PolyType Attribute-Specific? |
+|--------|---------------------|-----------------|------------------------------|
 | `DefaultLocation` | Returns first location of GenerationScope | Returns `null` | **No** - just a different default |
 | `NormalizeType` | Returns type unchanged | Erases compiler metadata (nullable annotations, tuple labels) | **No** - general normalization |
 | `SymbolComparer` | Returns `SymbolEqualityComparer.Default` | Not overridden | N/A |
@@ -25,17 +25,17 @@ Below is the complete analysis of all virtual methods in `TypeDataModelGenerator
 | `FlattenSystemTupleTypes` | Returns `false` | Returns `true` (for F# support) | **No** - general F# support |
 | `IncludeDelegateParameters` | Returns `false` | Returns `true` | **No** - general preference |
 | `SkipObjectMemberResolution` | Skips simple types, etc. | Not overridden | N/A |
-| `ResolveConstructors` | Resolves accessible constructors | **Complex override** with ConstructorShapeAttribute support and heuristic selection | **Partially** - attribute parsing is source-gen specific, but heuristics are general |
-| `ResolveProperties` | Resolves public properties/fields | Adds duplicate name validation with diagnostics | **Partially** - diagnostic reporting is source-gen specific |
+| `ResolveConstructors` | Resolves accessible constructors | **Complex override** with ConstructorShapeAttribute support and heuristic selection | **Partially** - attribute parsing is PolyType-specific, but heuristics are general |
+| `ResolveProperties` | Resolves public properties/fields | Adds duplicate name validation with diagnostics | **Partially** - diagnostic reporting is PolyType-specific |
 | `IncludeProperty` | Public properties only | Adds PropertyShapeAttribute parsing | **Yes** - attribute parsing |
 | `IncludeField` | Public fields only | Adds PropertyShapeAttribute parsing | **Yes** - attribute parsing |
 | `IsRequiredByPolicy` (property) | Returns `null` | Adds DataMemberAttribute and PropertyShapeAttribute support | **Yes** - attribute parsing |
 | `IsRequiredByPolicy` (field) | Returns `null` | Adds DataMemberAttribute and PropertyShapeAttribute support | **Yes** - attribute parsing |
-| `ResolveMethods` | Returns empty | Complex override with MethodShapeAttribute support | **Partially** - attribute parsing is source-gen specific |
-| `ResolveEvents` | Returns empty | Complex override with EventShapeAttribute support | **Partially** - attribute parsing is source-gen specific |
-| `ResolveDerivedTypes` | Returns empty | Complex override with DerivedTypeShapeAttribute/KnownTypeAttribute support | **Partially** - attribute parsing is source-gen specific |
+| `ResolveMethods` | Returns empty | Complex override with MethodShapeAttribute support | **Partially** - attribute parsing is PolyType-specific |
+| `ResolveEvents` | Returns empty | Complex override with EventShapeAttribute support | **Partially** - attribute parsing is PolyType-specific |
+| `ResolveDerivedTypes` | Returns empty | Complex override with DerivedTypeShapeAttribute/KnownTypeAttribute support | **Partially** - attribute parsing is PolyType-specific |
 | `MapType` | Core type mapping | Adds TypeShapeAttribute, TypeShapeExtension, F# types, surrogate handling | **Yes** - heavily uses PolyType-specific attributes |
-| `MapMethod` | Maps method parameters | Adds generic method rejection + Unit type handling | **Partially** - diagnostic reporting is source-gen specific |
+| `MapMethod` | Maps method parameters | Adds generic method rejection + Unit type handling | **Partially** - diagnostic reporting is PolyType-specific |
 | `GetEffectiveReturnType` | Unwraps Task/ValueTask | Not overridden | N/A |
 | `MapEvent` | Maps event to data model | Not overridden | N/A |
 | `ParseCustomAssociatedTypeAttributes` | Returns empty | Complex override for custom attributes | **Yes** - attribute parsing |
@@ -82,13 +82,42 @@ Move the following implementations from `Parser` to `TypeDataModelGenerator`:
 2. **`IsSupportedType`**: Add exclusion of ref-like types and static types
 3. **`FlattenSystemTupleTypes`**: Change default to `true` (better F# support)
 4. **`IncludeDelegateParameters`**: Change default to `true`
-5. **`ResolveConstructors`**: Move the selection heuristic to the base class:
+5. **`ResolveConstructors`**: Move the selection heuristic to the base class (see `Parser.cs` lines 305-390 for the implementation):
    ```csharp
-   protected virtual IEnumerable<IMethodSymbol> ResolveConstructors(...)
+   protected virtual IEnumerable<IMethodSymbol> ResolveConstructors(ITypeSymbol type, ImmutableArray<PropertyDataModel> properties)
    {
-       // Base implementation provides the heuristic-based selection
-       // without any attribute parsing
-       // See current Parser implementation for the logic
+       // 1. First check for attribute-marked constructors via virtual hook
+       if (ResolveAttributeMarkedConstructor(type) is { } markedCtor)
+       {
+           return [markedCtor];
+       }
+       
+       // 2. Get all public accessible constructors (existing base logic)
+       IMethodSymbol[] constructors = base.ResolveConstructors(type, properties)
+           .Where(ctor => ctor.DeclaredAccessibility is Accessibility.Public)
+           .ToArray();
+       
+       // 3. Apply heuristic selection based on readable properties
+       // Build a dictionary of (Type, Name) -> isReadOnly for all readable properties
+       Dictionary<(ITypeSymbol, string), bool> readableProperties = new(s_ctorParamComparer);
+       foreach (var prop in properties)
+       {
+           if (prop.IncludeGetter)
+           {
+               var key = (prop.PropertyType, prop.Name);
+               bool isCurrentPropertyReadOnly = !prop.IncludeSetter;
+               if (readableProperties.TryGetValue(key, out bool isReadOnly))
+                   readableProperties[key] = isReadOnly && isCurrentPropertyReadOnly;
+               else
+                   readableProperties[key] = isCurrentPropertyReadOnly;
+           }
+       }
+       
+       // 4. Rank constructors by: minimize unmatched required params, 
+       //    maximize read-only property matches, minimize total params
+       return constructors
+           .OrderByDescending(ctor => /* ranking logic */)
+           .Take(1);
    }
    ```
 6. **`ResolveMethods`**: Implement default resolution of public ordinary methods (excluding Object methods, compiler-generated, etc.)
@@ -166,7 +195,7 @@ If the above refactoring proves complex due to the tight integration of attribut
 
 Create a new class in `PolyType.Roslyn`:
 
-```
+```text
 TypeDataModelGenerator (base - minimal)
     └── PolyTypeModelGenerator (new - with good defaults)
         └── Parser (source generator - with attribute parsing and diagnostics)
