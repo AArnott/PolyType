@@ -1,4 +1,4 @@
-using Microsoft.CodeAnalysis;
+﻿using Microsoft.CodeAnalysis;
 using PolyType.Roslyn;
 using PolyType.SourceGenerator.Helpers;
 using PolyType.SourceGenerator.Model;
@@ -23,6 +23,13 @@ internal sealed partial class SourceFormatter
 
     private void FormatUnsafeAccessor(SourceWriter writer, TypeShapeModel type, int declaringTypeIndex, GenericTypeModel? genericType, string declaration)
     {
+        if (!provider.SupportsReflectionMetadata)
+        {
+            // Targets without reflection metadata (e.g. NetWasm) cannot compile [UnsafeAccessor] externs
+            // and have no reflection fallback either, so emit a throwing stub instead.
+            declaration = StubUnsafeAccessor(declaration);
+        }
+
         if (genericType is null)
         {
             writer.WriteLine();
@@ -38,6 +45,30 @@ internal sealed partial class SourceFormatter
         }
 
         group.Declarations.Add(declaration);
+    }
+
+    private static string StubUnsafeAccessor(string declaration)
+    {
+        string[] lines = declaration.Replace("\r\n", "\n").Split('\n');
+        List<string> kept = new(lines.Length);
+        foreach (string line in lines)
+        {
+            if (line.TrimStart().StartsWith("[global::System.Runtime.CompilerServices.UnsafeAccessor", StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            kept.Add(line);
+        }
+
+        string result = string.Join("\n", kept).TrimEnd();
+        result = result.Replace(" extern ", " ");
+        if (result.EndsWith(";", StringComparison.Ordinal))
+        {
+            result = result.Substring(0, result.Length - 1) + " { throw new global::System.NotSupportedException(\"Accessing inaccessible members requires UnsafeAccessorAttribute or reflection, neither of which this platform supports.\"); }";
+        }
+
+        return result;
     }
 
     private void FormatGenericAccessorClasses(SourceWriter writer)
