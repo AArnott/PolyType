@@ -19,10 +19,12 @@ public interface IConstructorShape
     /// </summary>
     bool IsPublic { get; }
 
+#if !NETWASM
     /// <summary>
     /// Gets the underlying <see cref="MethodBase"/> corresponding to the constructor, if applicable.
     /// </summary>
     MethodBase? MethodBase { get; }
+#endif
 
     /// <summary>
     /// Gets the provider used for method-level attribute resolution.

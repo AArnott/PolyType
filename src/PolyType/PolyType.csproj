@@ -1,6 +1,6 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="NetWasm.Sdk">
   <PropertyGroup>
-    <TargetFrameworks>net10.0;net9.0;net8.0;net472;netstandard2.0</TargetFrameworks>
+    <TargetFrameworks>net10.0;net9.0;net8.0;net472;netstandard2.0;netwasm0.1</TargetFrameworks>
     <IsAotCompatible Condition="$([MSBuild]::IsTargetFrameworkCompatible('$(TargetFramework)','net8.0'))">true</IsAotCompatible>
     <IsPackable>true</IsPackable>
     <PackageReadmeFile>README.md</PackageReadmeFile>
@@ -10,7 +10,7 @@
     <PackageValidationBaselineVersion>1.0.0</PackageValidationBaselineVersion>
   </PropertyGroup>
 
-  <PropertyGroup Condition="!$([MSBuild]::IsTargetFrameworkCompatible('$(TargetFramework)','net8.0'))">
+  <PropertyGroup Condition="!$([MSBuild]::IsTargetFrameworkCompatible('$(TargetFramework)','net8.0')) and '$(TargetFramework)'!='netwasm0.1'">
     <!-- XML comments should not warn in targets where IShapeable{T} is not available -->
     <NoWarn>$(NoWarn);CS1574</NoWarn>
   </PropertyGroup>
@@ -23,21 +23,37 @@
     <Compile Include="..\Shared\Polyfills\FSharpSourceConstructFlags.cs" Link="Shared\Polyfills\%(Filename).cs" />
   </ItemGroup>
 
-  <ItemGroup Condition="!$([MSBuild]::IsTargetFrameworkCompatible('$(TargetFramework)','net8.0'))">
+  <ItemGroup Condition="!$([MSBuild]::IsTargetFrameworkCompatible('$(TargetFramework)','net8.0')) and '$(TargetFramework)'!='netwasm0.1'">
     <Compile Include="..\Shared\Polyfills\NullabilityInfo\*.cs " Link="Shared\Polyfills\NullabilityInfo\%(Filename).cs" />
     <Compile Include="..\Shared\Polyfills\LinkerAttributes\*.cs " Link="Shared\Polyfills\LinkerAttributes\%(Filename).cs" />
   </ItemGroup>
 
-  <ItemGroup>
-    <None Include="README.md" pack="true" PackagePath="." />
+  <!-- NetWasm (netwasm0.1) proof of concept: only the source generator model is supported (no reflection provider). -->
+  <PropertyGroup Condition="'$(TargetFramework)'=='netwasm0.1'">
+    <EnablePackageValidation>false</EnablePackageValidation>
+    <IsAotCompatible>false</IsAotCompatible>
+    <!-- NetWasm reference assemblies are not strong-named (CS8002). -->
+    <SignAssembly>false</SignAssembly>
+    <!-- XML doc crefs to reflection types (and reflection-only members) do not resolve on netwasm0.1. -->
+    <NoWarn>$(NoWarn);CS1574;CS1591</NoWarn>
+  </PropertyGroup>
+  <ItemGroup Condition="'$(TargetFramework)'=='netwasm0.1'">
+    <Compile Remove="ReflectionProvider\**" />
+    <Compile Remove="..\Shared\Helpers\ReflectionHelpers.cs" />
+    <Using Remove="System.Net.Http" />
+    <PackageReference Include="NetWasm.System.Linq" />
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\PolyType.SourceGenerator\PolyType.SourceGenerator.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
+    <None Include="README.md" pack="true" PackagePath="README.md" />
   </ItemGroup>
 
   <ItemGroup>
-    <None Include="..\PolyType.SourceGenerator\bin\$(Configuration)\netstandard2.0\PolyType.SourceGenerator.dll" Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false" />
+    <ProjectReference Include="..\PolyType.SourceGenerator\PolyType.SourceGenerator.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" SetTargetFramework="TargetFramework=netstandard2.0" PrivateAssets="all" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="..\PolyType.SourceGenerator\bin\$(Configuration)\netstandard2.0\PolyType.SourceGenerator.dll" Pack="true" PackagePath="analyzers/dotnet/cs/PolyType.SourceGenerator.dll" Visible="false" />
   </ItemGroup>
 
   <ItemGroup>
@@ -47,10 +63,25 @@
     </PackageReference>
   </ItemGroup>
 
-  <ItemGroup Condition="!$([MSBuild]::IsTargetFrameworkCompatible('$(TargetFramework)','net8.0'))">
+  <ItemGroup Condition="!$([MSBuild]::IsTargetFrameworkCompatible('$(TargetFramework)','net8.0')) and '$(TargetFramework)'!='netwasm0.1'">
     <PackageReference Include="System.Memory" />
     <PackageReference Include="System.Reflection.Emit.Lightweight" />
     <PackageReference Include="System.Runtime.CompilerServices.Unsafe" />
     <PackageReference Include="System.Threading.Tasks.Extensions" />
   </ItemGroup>
+  <!--
+    NetWasm proof of concept workaround: NetWasm.Sdk 0.5.0's pack reads %(PackageReference.Version) directly,
+    which is empty under Central Package Management (NWPK006). Copy the central versions onto the references.
+  -->
+  <Target Name="NetWasmPocApplyCentralPackageVersions" BeforeTargets="NetWasmSdkCollectInnerPackageReferences" Condition="'$(ManagePackageVersionsCentrally)'=='true'">
+    <ItemGroup>
+      <_NetWasmPocPackageReferenceCross Include="@(PackageReference)">
+        <CentralId>%(PackageVersion.Identity)</CentralId>
+        <CentralVersion>%(PackageVersion.Version)</CentralVersion>
+      </_NetWasmPocPackageReferenceCross>
+      <_NetWasmPocPackageReferenceCross Remove="@(_NetWasmPocPackageReferenceCross)" Condition="'%(_NetWasmPocPackageReferenceCross.Identity)'!='%(_NetWasmPocPackageReferenceCross.CentralId)' or '%(_NetWasmPocPackageReferenceCross.Version)'!=''" />
+      <PackageReference Remove="@(_NetWasmPocPackageReferenceCross)" />
+      <PackageReference Include="@(_NetWasmPocPackageReferenceCross)" Version="%(_NetWasmPocPackageReferenceCross.CentralVersion)" />
+    </ItemGroup>
+  </Target>
 </Project>

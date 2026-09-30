@@ -50,6 +50,7 @@ public static class ReflectionUtilities
         return attributeProvider.GetCustomAttributes(typeof(TAttribute), inherit).OfType<TAttribute>();
     }
 
+#if !NETWASM
     /// <summary>
     /// Returns a name suitable for auto-deriving DerivedTypeShapeAttribute.Name that includes type arguments separated by underscores.
     /// </summary>
@@ -128,4 +129,14 @@ public static class ReflectionUtilities
             }
         }
     }
+#else
+    public static string GetDerivedTypeShapeName(Type type)
+    {
+        // NetWasm: System.Type cannot enumerate generic arguments or element types, so only the simple name is used.
+        Throw.IfNull(type);
+        string name = type.Name;
+        int backtickIndex = name.IndexOf('`');
+        return backtickIndex >= 0 ? name[..backtickIndex] : name;
+    }
+#endif
 }

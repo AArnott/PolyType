@@ -34,10 +34,12 @@ public interface IEventShape
     /// </summary>
     IFunctionTypeShape HandlerType { get; }
 
+#if !NETWASM
     /// <summary>
     /// Gets the underlying <see cref="System.Reflection.EventInfo"/> representing the event, if available.
     /// </summary>
     EventInfo? EventInfo { get; }
+#endif
 
     /// <summary>
     /// Gets the provider used for event-level attribute resolution.

@@ -1,5 +1,7 @@
 ﻿using PolyType.Abstractions;
+#if !NETWASM
 using PolyType.ReflectionProvider;
+#endif
 using PolyType.Utilities;
 using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
@@ -169,6 +171,10 @@ public static class TypeShapeResolver
 
         private static Func<ITypeShape<T>?>? CreateResolveDynamicFactory()
         {
+#if NETWASM
+            // NetWasm: no Type.GetCustomAttribute or Activator-based discovery; dynamic resolution is unsupported.
+            return null;
+#else
             if (typeof(TProvider).GetCustomAttribute<TypeShapeProviderAttribute>() is { } attr)
             {
                 Type typeShapeProviderType = attr.TypeShapeProvider;
@@ -189,6 +195,7 @@ public static class TypeShapeResolver
             }
 #endif
             return null;
+#endif
         }
     }
 }

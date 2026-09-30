@@ -25,7 +25,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <None Include="$(RepoRoot)\pkgicon.png" Pack="true" PackagePath="\" />
+    <None Include="$(RepoRoot)\pkgicon.png" Pack="true" PackagePath="pkgicon.png" />
   </ItemGroup>
 
   <ItemGroup>

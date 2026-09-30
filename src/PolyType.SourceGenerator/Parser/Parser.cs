@@ -1545,6 +1545,7 @@ public sealed partial class Parser : TypeDataModelGenerator
             UsesUpdatedMemorySafetyRules = _usesUpdatedMemorySafetyRules,
             SupportsDoNotWrapExceptions = _knownSymbols.Compilation.GetTypeByMetadataName("System.Reflection.BindingFlags")?.GetMembers("DoNotWrapExceptions").Length > 0,
             SupportsMemoryMarshalCreateSpan = _knownSymbols.Compilation.GetTypeByMetadataName("System.Runtime.InteropServices.MemoryMarshal")?.GetMembers("CreateSpan").Length > 0,
+            SupportsReflectionMetadata = _knownSymbols.Compilation.GetTypeByMetadataName("System.Reflection.MethodBase") is not null,
         };
     }
 

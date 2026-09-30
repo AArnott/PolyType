@@ -74,6 +74,7 @@ public interface IParameterShape
     /// <remarks>For property initializers, this reflects the accessibility of the setter.</remarks>
     bool IsPublic { get; }
 
+#if !NETWASM
     /// <summary>
     /// Gets the underlying <see cref="System.Reflection.ParameterInfo"/> representing the parameter, if available.
     /// </summary>
@@ -82,6 +83,7 @@ public interface IParameterShape
     /// or <see langword="null"/> otherwise.
     /// </remarks>
     ParameterInfo? ParameterInfo { get; }
+#endif
 
     /// <summary>
     /// Gets the underlying <see cref="System.Reflection.MemberInfo"/> representing the parameter, if available.

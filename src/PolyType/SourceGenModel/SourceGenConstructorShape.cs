@@ -25,10 +25,12 @@ public sealed class SourceGenConstructorShape<TDeclaringType, TArgumentState> : 
     /// </summary>
     public Func<SourceGenAttributeInfo[]>? AttributeFactory { get; init; }
 
+#if !NETWASM
     /// <summary>
     /// Gets the method base resolver factory.
     /// </summary>
     public Func<MethodBase?>? MethodBaseFactory { get; init; }
+#endif
 
     /// <summary>
     /// Gets the parameter shapes for the constructor.
@@ -64,7 +66,9 @@ public sealed class SourceGenConstructorShape<TDeclaringType, TArgumentState> : 
     object? IConstructorShape.Accept(TypeShapeVisitor visitor, object? state) => visitor.VisitConstructor(this, state);
     IObjectTypeShape IConstructorShape.DeclaringType => DeclaringType;
 
+#if !NETWASM
     MethodBase? IConstructorShape.MethodBase => field ??= MethodBaseFactory?.Invoke();
+#endif
 
     IGenericCustomAttributeProvider IConstructorShape.AttributeProvider => field ?? CommonHelpers.ExchangeIfNull(ref field, SourceGenCustomAttributeProvider.Create(AttributeFactory));
 

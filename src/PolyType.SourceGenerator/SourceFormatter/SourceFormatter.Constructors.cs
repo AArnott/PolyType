@@ -17,7 +17,7 @@ internal sealed partial class SourceFormatter
         string constructorArgumentStateFQN = FormatConstructorArgumentStateFQN(type, constructor);
         string? constructorParameterFactoryName = constructor.TotalArity > 0 ? $"__CreateConstructorParameters_{type.SourceIdentifier}" : null;
         string? attributeFactoryName = constructor.Attributes.Length > 0 ? $"__CreateConstructorAttributes_{type.SourceIdentifier}" : null;
-        string? constructorInfoResolverName = GetConstructorInfoResolverName(type, constructor);
+        string? constructorInfoResolverName = provider.SupportsReflectionMetadata ? GetConstructorInfoResolverName(type, constructor) : null;
 
         writer.WriteLine($"private global::PolyType.Abstractions.IConstructorShape {methodName}()");
         writer.WriteLine('{');
@@ -31,7 +31,7 @@ internal sealed partial class SourceFormatter
                 DefaultConstructor = {{FormatDefaultCtor(type, constructor)}},
                 ArgumentStateConstructor = {{FormatArgumentStateCtor(type, constructor, constructorArgumentStateFQN)}},
                 ParameterizedConstructor = {{FormatParameterizedCtor(type, constructor, constructorArgumentStateFQN)}},
-                MethodBaseFactory = {{FormatMethodBaseFactory(type, constructor, constructorInfoResolverName)}},
+                MethodBaseFactory = {{(provider.SupportsReflectionMetadata ? FormatMethodBaseFactory(type, constructor, constructorInfoResolverName) : "null")}},
                 AttributeFactory = {{FormatNull(attributeFactoryName)}},
                 IsPublic = {{FormatBool(constructor.IsPublic)}},
             };
@@ -341,7 +341,7 @@ internal sealed partial class SourceFormatter
                     Getter = static (ref {{constructorArgumentStateFQN}} state) => {{FormatGetterBody(constructor, parameter)}},
                     Setter = static (ref {{constructorArgumentStateFQN}} state, {{parameter.ParameterType.FullyQualifiedName}} value) => {{FormatSetterBody(constructor, parameter)}},
                     AttributeFactory = {{FormatNull(attributeFactoryName)}},
-                    ReflectionInfoFactory = {{FormatAttributeProviderFunc(type, constructor, parameter, constructorInfoResolverName)}},
+                    ReflectionInfoFactory = {{(provider.SupportsReflectionMetadata ? FormatAttributeProviderFunc(type, constructor, parameter, constructorInfoResolverName) : "null")}},
                 },
                 """, trimDefaultAssignmentLines: true);
 

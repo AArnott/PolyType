@@ -46,10 +46,12 @@ public sealed class SourceGenMethodShape<TDeclaringType, TArgumentState, TResult
     /// </summary>
     public Func<SourceGenAttributeInfo[]>? AttributeFactory { get; init; }
 
+#if !NETWASM
     /// <summary>
     /// Gets the method base resolver factory.
     /// </summary>
     public Func<MethodBase?>? MethodBaseFactory { get; init; }
+#endif
 
     /// <summary>
     /// Gets a delegate for creating argument state constructor.
@@ -63,7 +65,9 @@ public sealed class SourceGenMethodShape<TDeclaringType, TArgumentState, TResult
 
     IReadOnlyList<IParameterShape> IMethodShape.Parameters => field ?? CommonHelpers.ExchangeIfNull(ref field, (ParametersFactory?.Invoke()).AsReadOnlyList());
 
+#if !NETWASM
     MethodBase? IMethodShape.MethodBase => field ??= MethodBaseFactory?.Invoke();
+#endif
 
     IGenericCustomAttributeProvider IMethodShape.AttributeProvider => field ?? CommonHelpers.ExchangeIfNull(ref field, SourceGenCustomAttributeProvider.Create(AttributeFactory));
 

@@ -120,7 +120,9 @@ internal sealed class ConstructorShapeDebugView(IConstructorShape ctorShape) : I
     public IObjectTypeShape DeclaringType => ctorShape.DeclaringType;
     public bool IsPublic => ctorShape.IsPublic;
     public IReadOnlyList<IParameterShape> Parameters => ctorShape.Parameters;
+#if !NETWASM
     public MethodBase? MethodBase => ctorShape.MethodBase;
+#endif
     public IGenericCustomAttributeProvider AttributeProvider => ctorShape.AttributeProvider;
     object? IConstructorShape.Accept(TypeShapeVisitor visitor, object? state) => ctorShape.Accept(visitor, state);
 }
@@ -139,7 +141,9 @@ internal sealed class MethodShapeDebugView(IMethodShape methodShape) : IMethodSh
     public bool IsVoidLike => methodShape.IsVoidLike;
     public bool IsAsync => methodShape.IsAsync;
     public IReadOnlyList<IParameterShape> Parameters => methodShape.Parameters;
+#if !NETWASM
     public MethodBase? MethodBase => methodShape.MethodBase;
+#endif
     public IGenericCustomAttributeProvider AttributeProvider => methodShape.AttributeProvider;
     object? IMethodShape.Accept(TypeShapeVisitor visitor, object? state) => methodShape.Accept(visitor, state);
 }
@@ -159,7 +163,9 @@ internal sealed class ParameterShapeDebugView(IParameterShape parameterShape) : 
     public bool IsNonNullable => parameterShape.IsNonNullable;
     public bool IsPublic => parameterShape.IsPublic;
     public ITypeShape ParameterType => parameterShape.ParameterType;
+#if !NETWASM
     public ParameterInfo? ParameterInfo => parameterShape.ParameterInfo;
+#endif
     public MemberInfo? MemberInfo => parameterShape.MemberInfo;
     public IGenericCustomAttributeProvider AttributeProvider => parameterShape.AttributeProvider;
     object? IParameterShape.Accept(TypeShapeVisitor visitor, object? state) => parameterShape.Accept(visitor, state);
@@ -198,7 +204,9 @@ internal sealed class EventShapeDebugView(IEventShape eventShape) : IEventShape
     public bool IsPublic => eventShape.IsPublic;
     public bool IsStatic => eventShape.IsStatic;
     public IFunctionTypeShape HandlerType => eventShape.HandlerType;
+#if !NETWASM
     public EventInfo? EventInfo => eventShape.EventInfo;
+#endif
     public IGenericCustomAttributeProvider AttributeProvider => eventShape.AttributeProvider;
     object? IEventShape.Accept(TypeShapeVisitor visitor, object? state) => eventShape.Accept(visitor, state);
 }

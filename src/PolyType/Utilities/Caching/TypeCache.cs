@@ -1,6 +1,6 @@
 ﻿using PolyType.Abstractions;
 using System.Collections;
-#if !NET
+#if !NET && !NETWASM
 using System.Collections.Concurrent;
 #endif
 using System.Diagnostics;
@@ -20,7 +20,7 @@ namespace PolyType.Utilities;
 public sealed class TypeCache : IReadOnlyDictionary<Type, object?>
 {
     private readonly ConditionalWeakTable<Type, Entry> _cache = new();
-#if !NET
+#if !NET && !NETWASM
     // .NET Standard 2.0's ConditionalWeakTable doesn't support enumeration or Count,
     // so we track keys separately using weak references to avoid rooting types.
     // This is an append-only collection; dead entries are periodically compacted.
@@ -91,7 +91,7 @@ public sealed class TypeCache : IReadOnlyDictionary<Type, object?>
     /// <summary>
     /// Gets the total number of entries in the cache.
     /// </summary>
-#if NET
+#if NET || NETWASM
     public int Count => _cache.Count();
 #else
     public int Count => GetLiveKeys().Count();
@@ -126,7 +126,7 @@ public sealed class TypeCache : IReadOnlyDictionary<Type, object?>
         {
             lock (LockObject)
             {
-#if NET
+#if NET || NETWASM
                 _cache.AddOrUpdate(type, new Entry(value));
 #else
                 if (_cache.TryGetValue(type, out _))
@@ -247,8 +247,10 @@ public sealed class TypeCache : IReadOnlyDictionary<Type, object?>
     internal object LockObject => _cache;
     internal void AddUnsynchronized(Type type, object? value)
     {
+#if !NETWASM // NetWasm: no Monitor.IsEntered
         Debug.Assert(Monitor.IsEntered(LockObject), "Must be called within a lock.");
-#if NET
+#endif
+#if NET || NETWASM
         bool result = _cache.TryAdd(type, new Entry(value));
         Debug.Assert(result || ReferenceEquals(_cache.GetOrCreateValue(type).Value, value), "should only be pre-populated with the same value.");
 #else
@@ -269,7 +271,7 @@ public sealed class TypeCache : IReadOnlyDictionary<Type, object?>
     {
         lock (LockObject)
         {
-#if NET
+#if NET || NETWASM
             return _cache.TryAdd(type, entry);
 #else
             if (_cache.TryGetValue(type, out _))
@@ -308,7 +310,7 @@ public sealed class TypeCache : IReadOnlyDictionary<Type, object?>
         public object? GetValueOrException() => Exception is { } e ? e : Value;
     }
 
-#if NET
+#if NET || NETWASM
     IEnumerable<Type> IReadOnlyDictionary<Type, object?>.Keys => _cache.Select(kvp => kvp.Key);
     IEnumerable<object?> IReadOnlyDictionary<Type, object?>.Values => _cache.Select(kvp => kvp.Value.GetValueOrException());
     IEnumerator IEnumerable.GetEnumerator() => ((IEnumerable<KeyValuePair<Type, object?>>)this).GetEnumerator();
@@ -345,7 +347,9 @@ public sealed class TypeCache : IReadOnlyDictionary<Type, object?>
 
     private void InsertTypeIntoKeyQueueUnsynchronized(Type type)
     {
+#if !NETWASM // NetWasm: no Monitor.IsEntered
         Debug.Assert(Monitor.IsEntered(LockObject), "Must be called within a lock.");
+#endif
         Debug.Assert(!_keys.Any(wr => wr.TryGetTarget(out Type? t) && t == type), "Type should not already be present in the key queue.");
 
         _keys.Enqueue(new WeakReference<Type>(type));

@@ -67,7 +67,9 @@ public sealed class SourceGenParameterShape<TArgumentState, TParameter> : IParam
     Getter<TArgumentState, TParameter> IParameterShape<TArgumentState, TParameter>.GetGetter() => Getter;
     Setter<TArgumentState, TParameter> IParameterShape<TArgumentState, TParameter>.GetSetter() => Setter;
 
+#if !NETWASM
     ParameterInfo? IParameterShape.ParameterInfo => ReflectionInfo as ParameterInfo;
+#endif
     MemberInfo? IParameterShape.MemberInfo => ReflectionInfo as MemberInfo;
 
     private ICustomAttributeProvider? ReflectionInfo => field ??= ReflectionInfoFactory?.Invoke();

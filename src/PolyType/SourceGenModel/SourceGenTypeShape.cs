@@ -61,12 +61,14 @@ public abstract class SourceGenTypeShape<T> : ITypeShape<T>
             static void ThrowArgumentNull() => throw new ArgumentNullException(nameof(associatedType));
         }
 
+#if !NETWASM // NetWasm: System.Type has no generic type inspection.
         if (associatedType.IsGenericTypeDefinition && typeof(T).GenericTypeArguments.Length != associatedType.GetTypeInfo().GenericTypeParameters.Length)
         {
             ThrowArgumentException();
             [DoesNotReturn]
             static void ThrowArgumentException() => throw new ArgumentException("Type is not a generic type definition or does not have an equal count of generic type parameters with this type shape.", nameof(associatedType));
         }
+#endif
 
         return GetAssociatedTypeShape?.Invoke(associatedType);
     }

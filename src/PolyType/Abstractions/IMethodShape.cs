@@ -47,10 +47,12 @@ public interface IMethodShape
     /// </summary>
     bool IsAsync { get; }
 
+#if !NETWASM
     /// <summary>
     /// Gets the underlying <see cref="System.Reflection.MethodBase"/> corresponding to the method, if applicable.
     /// </summary>
     MethodBase? MethodBase { get; }
+#endif
 
     /// <summary>
     /// Gets the provider used for method-level attribute resolution.

@@ -45,16 +45,20 @@ public sealed class SourceGenEventShape<TDeclaringType, TEventHandler> : IEventS
     /// </summary>
     public Func<SourceGenAttributeInfo[]>? AttributeFactory { get; init; }
 
+#if !NETWASM
     /// <summary>
     /// Gets the factory function for retrieving the EventInfo of the event.
     /// </summary>
     public Func<EventInfo?>? EventInfoFactory { get; init; }
+#endif
 
     ITypeShape IEventShape.DeclaringType => DeclaringType;
 
     IFunctionTypeShape IEventShape.HandlerType => HandlerType;
 
+#if !NETWASM
     EventInfo? IEventShape.EventInfo => field ??= EventInfoFactory?.Invoke();
+#endif
 
     IGenericCustomAttributeProvider IEventShape.AttributeProvider => field ?? CommonHelpers.ExchangeIfNull(ref field, SourceGenCustomAttributeProvider.Create(AttributeFactory));
 

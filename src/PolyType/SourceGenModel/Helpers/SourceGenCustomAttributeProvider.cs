@@ -56,7 +56,7 @@ internal sealed class SourceGenCustomAttributeProvider(Func<SourceGenAttributeIn
         List<Attribute> list = [];
         foreach (SourceGenAttributeInfo attributeInfo in attributeFactory())
         {
-            if ((inherit || !attributeInfo.IsInherited) && attributeType.IsInstanceOfType(attributeInfo.Attribute))
+            if ((inherit || !attributeInfo.IsInherited) && IsInstanceOf(attributeType, attributeInfo.Attribute))
             {
                 list.Add(attributeInfo.Attribute);
             }
@@ -78,13 +78,21 @@ internal sealed class SourceGenCustomAttributeProvider(Func<SourceGenAttributeIn
         return false;
     }
 
+    private static bool IsInstanceOf(Type attributeType, Attribute attribute)
+#if NETWASM
+        // NetWasm: System.Type has no IsInstanceOfType/IsAssignableFrom, so only exact type matches are found.
+        => attributeType == typeof(Attribute) || attribute.GetType() == attributeType;
+#else
+        => attributeType.IsInstanceOfType(attribute);
+#endif
+
     public bool IsDefined(Type attributeType, bool inherit)
     {
         Throw.IfNull(attributeType);
 
         foreach (SourceGenAttributeInfo attributeInfo in attributeFactory())
         {
-            if ((inherit || !attributeInfo.IsInherited) && attributeType.IsInstanceOfType(attributeInfo.Attribute))
+            if ((inherit || !attributeInfo.IsInherited) && IsInstanceOf(attributeType, attributeInfo.Attribute))
             {
                 return true;
             }
