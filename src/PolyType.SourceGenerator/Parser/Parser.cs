@@ -1541,7 +1541,8 @@ public sealed partial class Parser : TypeDataModelGenerator
             SuppressedDiagnosticIds = _suppressedDiagnosticIds is { Count: > 0 } diagnosticIds
                 ? diagnosticIds.OrderBy(id => id, StringComparer.Ordinal).ToImmutableEquatableArray()
                 : [],
-            TargetSupportsIShapeableOfT = _knownSymbols.TargetFramework >= TargetFramework.Net80,
+            TargetSupportsIShapeableOfT = _knownSymbols.TargetFramework >= TargetFramework.Net80
+                && _knownSymbols.Compilation.GetTypeByMetadataName("PolyType.IShapeable`1") is not null, // Not available on NetWasm (netwasm0.1).
             UsesUpdatedMemorySafetyRules = _usesUpdatedMemorySafetyRules,
             SupportsDoNotWrapExceptions = _knownSymbols.Compilation.GetTypeByMetadataName("System.Reflection.BindingFlags")?.GetMembers("DoNotWrapExceptions").Length > 0,
             SupportsMemoryMarshalCreateSpan = _knownSymbols.Compilation.GetTypeByMetadataName("System.Runtime.InteropServices.MemoryMarshal")?.GetMembers("CreateSpan").Length > 0,
