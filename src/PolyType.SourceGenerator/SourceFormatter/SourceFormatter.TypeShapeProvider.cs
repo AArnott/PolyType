@@ -56,6 +56,27 @@ internal sealed partial class SourceFormatter
             provider.ProvidedTypes.Values.Select(t => t.ReflectionName).Distinct().Count() == provider.ProvidedTypes.Count, 
             "The string-based type identifier should be unique to each generated type.");
 
+        if (!provider.SupportsReflectionMetadata)
+        {
+            // Reflection-less targets (e.g. NetWasm's netwasm0.1) have no runtime type names,
+            // so Type.ToString() cannot be used as a lookup key. Compare type identities directly.
+            writer.WriteLine("""
+                /// <inheritdoc/>
+                public override global::PolyType.ITypeShape? GetTypeShape(global::System.Type type)
+                {
+                """);
+            writer.Indentation++;
+            foreach (TypeShapeModel typeModel in provider.ProvidedTypes.Values.OrderBy(t => t.SourceIdentifier, StringComparer.Ordinal))
+            {
+                writer.WriteLine($"if (type == typeof({typeModel.Type.FullyQualifiedName})) return {typeModel.SourceIdentifier};");
+            }
+
+            writer.WriteLine("return null;");
+            writer.Indentation--;
+            writer.WriteLine('}');
+            return;
+        }
+
         writer.WriteLine("""
             /// <inheritdoc/>
             public override global::PolyType.ITypeShape? GetTypeShape(global::System.Type type)
